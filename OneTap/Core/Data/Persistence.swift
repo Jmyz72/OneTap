@@ -15,18 +15,46 @@ struct PersistenceController {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
         
+        // Create sample accounts
+        let checkingAccount = Account(context: viewContext)
+        checkingAccount.id = UUID()
+        checkingAccount.name = "Maybank Checking"
+        checkingAccount.type = AccountType.checking.rawValue
+        checkingAccount.balance = 5240.75
+        checkingAccount.currency = "MYR"
+        checkingAccount.icon = AccountType.checking.icon
+        checkingAccount.createdAt = Date()
+        
+        let savingsAccount = Account(context: viewContext)
+        savingsAccount.id = UUID()
+        savingsAccount.name = "ASB Savings"
+        savingsAccount.type = AccountType.savings.rawValue
+        savingsAccount.balance = 15000.00
+        savingsAccount.currency = "MYR"
+        savingsAccount.icon = AccountType.savings.icon
+        savingsAccount.createdAt = Date()
+        
+        let creditCard = Account(context: viewContext)
+        creditCard.id = UUID()
+        creditCard.name = "CIMB Travel"
+        creditCard.type = AccountType.creditCard.rawValue
+        creditCard.balance = -1250.50
+        creditCard.currency = "MYR"
+        creditCard.icon = AccountType.creditCard.icon
+        creditCard.createdAt = Date()
+        
         // Create sample transactions
-        let sampleData: [(title: String, amount: Double, category: TransactionCategory, merchant: String, daysAgo: Int)] = [
-            ("Grocery Shopping", 85.43, .food, "Whole Foods", 0),
-            ("Monthly Salary", -4500.00, .salary, "Company Inc", 1),
-            ("Uber to Airport", 45.20, .transport, "Uber", 2),
-            ("Netflix Subscription", 15.99, .entertainment, "Netflix", 3),
-            ("New Headphones", 199.99, .shopping, "Amazon", 4),
-            ("Electricity Bill", 120.50, .bills, "PG&E", 5),
-            ("Gym Membership", 50.00, .health, "Fitness Center", 7),
-            ("Coffee", 5.75, .food, "Starbucks", 8),
-            ("Stock Dividend", -125.00, .investment, "Trading App", 10),
-            ("Gas Station", 60.00, .transport, "Shell", 12)
+        let sampleData: [(title: String, amount: Double, category: TransactionCategory, merchant: String, daysAgo: Int, account: Account?)] = [
+            ("Dinner at Pavilion", -85.43, .food, "Dining Co", 0, checkingAccount),
+            ("Monthly Salary", 4500.00, .salary, "Corporate HQ", 1, checkingAccount),
+            ("Grab to Office", -15.20, .transport, "Grab", 2, creditCard),
+            ("Netflix Subscription", -55.00, .entertainment, "Netflix", 3, creditCard),
+            ("Uniqlo Shopping", -199.99, .shopping, "Uniqlo", 4, creditCard),
+            ("TNB Bill", -120.50, .bills, "TNB", 5, checkingAccount),
+            ("Gym Membership", -150.00, .health, "Celebrity Fitness", 7, checkingAccount),
+            ("Tealive", -7.75, .food, "Tealive", 8, creditCard),
+            ("Dividends", 125.00, .investment, "Maybank", 10, savingsAccount),
+            ("Gas Station", -90.00, .transport, "Petronas", 12, checkingAccount)
         ]
         
         for data in sampleData {
@@ -37,6 +65,7 @@ struct PersistenceController {
             newTransaction.category = data.category.rawValue
             newTransaction.date = Calendar.current.date(byAdding: .day, value: -data.daysAgo, to: Date())
             newTransaction.merchant = data.merchant
+            newTransaction.account = data.account
         }
         
         do {
@@ -57,17 +86,6 @@ struct PersistenceController {
         }
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-
-                /*
-                 Typical reasons for an error here include:
-                 * The parent directory does not exist, cannot be created, or disallows writing.
-                 * The persistent store is not accessible, due to permissions or data protection when the device is locked.
-                 * The device is out of space.
-                 * The store could not be migrated to the current model version.
-                 Check the error message to determine what the actual problem was.
-                 */
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             }
         })
