@@ -2,73 +2,83 @@
 //  TransactionModel.swift
 //  OneTap
 //
-//  Created by Jimmy Hew on 29/12/2025.
-//
 
 import Foundation
+import SwiftUI
+import CoreData
 
-/// Categories for transactions
-enum TransactionCategory: String, CaseIterable, Identifiable {
-    case food = "Food"
-    case transport = "Transport"
-    case entertainment = "Entertainment"
-    case shopping = "Shopping"
-    case bills = "Bills"
-    case health = "Health"
-    case salary = "Salary"
-    case investment = "Investment"
-    case other = "Other"
+enum TransactionType: String, CaseIterable, Identifiable {
+    case expense = "Expense"
+    case income = "Income"
+    case transfer = "Transfer"
+    case adjustment = "Adjustment"
     
     var id: String { rawValue }
     
     var icon: String {
         switch self {
-        case .food: return "fork.knife"
-        case .transport: return "car.fill"
-        case .entertainment: return "film.fill"
-        case .shopping: return "cart.fill"
-        case .bills: return "doc.text.fill"
-        case .health: return "heart.fill"
-        case .salary: return "dollarsign.circle.fill"
-        case .investment: return "chart.line.uptrend.xyaxis"
-        case .other: return "ellipsis.circle.fill"
+        case .expense: return "arrow.up.right.circle.fill"
+        case .income: return "arrow.down.left.circle.fill"
+        case .transfer: return "arrow.left.and.right.circle.fill"
+        case .adjustment: return "slider.horizontal.3"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .expense: return .red
+        case .income: return .green
+        case .transfer: return .blue
+        case .adjustment: return .gray
         }
     }
 }
 
-/// Type of transaction (expense or income)
-enum TransactionType: String, CaseIterable {
-    case expense = "Expense"
-    case income = "Income"
-}
-
-/// Extension to make Transaction entity more usable
 extension Transaction {
-    var categoryEnum: TransactionCategory? {
-        guard let category = category else { return nil }
-        return TransactionCategory(rawValue: category)
+    var typeEnum: TransactionType {
+        get {
+            guard let typeString = type, let value = TransactionType(rawValue: typeString) else {
+                return .expense
+            }
+            return value
+        }
+        set {
+            type = newValue.rawValue
+        }
+    }
+    
+    var itemsArray: [TransactionItem] {
+        let set = items as? Set<TransactionItem> ?? []
+        return set.sorted { $0.title ?? "" < $1.title ?? "" }
     }
     
     var formattedAmount: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
+        let code = account?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
         
-        // Get global currency from UserDefaults to avoid circular SwiftUI dependency
-        let globalCurrency = UserDefaults.standard.string(forKey: "selectedCurrencyCode") ?? "MYR"
+        let prefix = typeEnum == .expense ? "-" : (typeEnum == .income ? "+" : "")
+        let formatted = formatter.string(from: NSNumber(value: abs(amount))) ?? "$0.00"
         
-        // Use the account's currency if available, otherwise fallback to global setting
-        formatter.currencyCode = account?.currency ?? globalCurrency
-        return formatter.string(from: NSNumber(value: amount)) ?? "$0.00"
+        return "\(prefix)\(formatted)"
     }
     
-    var formattedDate: String {
+    var formattedBalanceAfter: String {
+        let code = account?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        return formatter.string(from: NSNumber(value: balanceAfter)) ?? "$0.00"
+    }
+    
+    @objc var daySectionIdentifier: String {
         guard let date = date else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
+        return Formatters.date.string(from: date)
     }
-    
-    var isExpense: Bool {
-        amount >= 0
+}
+
+extension TransactionItem {
+    var formattedAmount: String {
+        let code = transaction?.account?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        
+        return formatter.string(from: NSNumber(value: amount)) ?? "$0.00"
     }
 }

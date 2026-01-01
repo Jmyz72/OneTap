@@ -22,11 +22,24 @@ struct AccountDetailView: View {
                 // Account Header Card
                 accountHeaderCard
                 
+                // Credit Card Visualization (if available)
+                if let last4 = account.lastFourDigits, !last4.isEmpty {
+                    creditCardView(last4: last4)
+                }
+                
                 // Quick Stats
                 quickStatsCard
                 
-                // Recent Transactions
-                recentTransactionsSection
+                // Transactions Header
+                HStack {
+                    Text("History")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Spacer()
+                }
+                
+                // Transaction List
+                AccountTransactionList(account: account)
             }
             .padding(20)
         }
@@ -145,6 +158,110 @@ struct AccountDetailView: View {
         .shadow(color: Color.black.opacity(0.4), radius: 20, x: 0, y: 10)
     }
     
+    private func creditCardView(last4: String) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    // Custom Chip View
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.9, green: 0.8, blue: 0.5), // Gold light
+                                    Color(red: 0.7, green: 0.6, blue: 0.3)  // Gold dark
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 40, height: 30)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                        )
+                        .overlay(
+                            // Chip lines
+                            HStack(spacing: 0) {
+                                Divider().background(Color.black.opacity(0.2))
+                                Spacer()
+                                Divider().background(Color.black.opacity(0.2))
+                            }
+                            .padding(.horizontal, 10)
+                        )
+                        .overlay(
+                            // Chip lines vertical
+                            VStack(spacing: 0) {
+                                Divider().background(Color.black.opacity(0.2))
+                                Spacer()
+                                Divider().background(Color.black.opacity(0.2))
+                            }
+                            .padding(.vertical, 8)
+                        )
+                    
+                    Spacer()
+                    
+                    Image(systemName: "wave.3.right")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Text("••••")
+                    Text("••••")
+                    Text("••••")
+                    Text(last4)
+                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(.white.opacity(0.9))
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("CARD HOLDER")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.6))
+                        Text(account.name?.uppercased() ?? "NAME")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                    }
+                    
+                    Spacer()
+                    
+                    if account.typeEnum == .creditCard {
+                        // Assuming generic Visa/Mastercard style logo if specific asset not known
+                        // Just text for now or simple circle
+                        Circle()
+                            .fill(Color.white.opacity(0.8))
+                            .frame(width: 20, height: 20)
+                            .overlay(
+                                Circle()
+                                    .fill(Color.white.opacity(0.6))
+                                    .frame(width: 20, height: 20)
+                                    .offset(x: -12)
+                            )
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(height: 200)
+        .frame(maxWidth: .infinity)
+        .background(
+            LinearGradient(
+                colors: [accountColor.opacity(0.8), accountColor.opacity(0.4)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(16)
+        .shadow(color: accountColor.opacity(0.3), radius: 10, x: 0, y: 5)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        )
+    }
+    
     private var quickStatsCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Details")
@@ -173,41 +290,6 @@ struct AccountDetailView: View {
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(Color.white.opacity(0.05), lineWidth: 1)
             )
-        }
-    }
-    
-    private var recentTransactionsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Recent Activity")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(AppTheme.textPrimary)
-                .padding(.leading, 4)
-            
-            if let transactions = account.transactions?.allObjects as? [Transaction], !transactions.isEmpty {
-                VStack(spacing: 12) {
-                    ForEach(transactions.prefix(5)) { transaction in
-                        TransactionRow(transaction: transaction)
-                    }
-                }
-            } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "tray")
-                        .font(.system(size: 48))
-                        .foregroundColor(AppTheme.textTertiary)
-                    
-                    Text("No transactions yet")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppTheme.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
-                .background(AppTheme.cardBackground.opacity(0.5))
-                .cornerRadius(20)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.05), lineWidth: 1)
-                )
-            }
         }
     }
     

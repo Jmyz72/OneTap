@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AccountRow: View {
-    let account: Account
+    @ObservedObject var account: Account
     
     var body: some View {
         HStack(spacing: 16) {

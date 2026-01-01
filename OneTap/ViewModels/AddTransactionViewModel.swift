@@ -1,0 +1,188 @@
+//
+//  AddTransactionViewModel.swift
+//  OneTap
+//
+//  ViewModel for adding new transactions
+//  Replaces logic from AddTransactionView.swift (lines 201-263)
+//
+
+import Foundation
+import SwiftUI
+import Combine
+
+@MainActor
+class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
+    // MARK: - Published State
+    @Published var amountString = "0"
+    @Published var selectedType: TransactionType = .expense
+    @Published var selectedCategory: Category?
+    @Published var selectedSubCategory: SubCategory?
+    @Published var selectedAccount: Account?
+    @Published var toAccount: Account?
+    @Published var transactionDate = Date()
+    @Published var note = ""
+    @Published var splitItems: [SplitItemData] = []
+
+    @Published var loadingState: LoadingState = .idle
+    @Published var errorMessage: String?
+
+    // MARK: - Dependencies
+    private let transactionRepository: TransactionRepository
+    private let transferService: TransferService
+    private let balanceService: BalanceService
+    private let validationService: ValidationService
+
+    init(
+        transactionRepository: TransactionRepository,
+        transferService: TransferService,
+        balanceService: BalanceService,
+        validationService: ValidationService
+    ) {
+        self.transactionRepository = transactionRepository
+        self.transferService = transferService
+        self.balanceService = balanceService
+        self.validationService = validationService
+    }
+
+    // MARK: - Computed Properties
+
+    var isValid: Bool {
+        guard let amount = Double(amountString), amount > 0 else { return false }
+
+        if splitItems.isEmpty {
+            if selectedType == .transfer {
+                return selectedAccount != nil && toAccount != nil
+            } else {
+                return selectedAccount != nil && selectedCategory != nil
+            }
+        }
+
+        return selectedAccount != nil
+    }
+
+    var totalAmount: Double {
+        if splitItems.isEmpty {
+            return Double(amountString) ?? 0
+        } else {
+            return splitItems.reduce(0) { $0 + $1.amount } + (Double(amountString) ?? 0)
+        }
+    }
+
+    // MARK: - Actions
+
+    func setupDefaults(accounts: [Account], categories: [Category]) {
+        if selectedAccount == nil {
+            selectedAccount = accounts.first
+        }
+        if selectedCategory == nil {
+            selectedCategory = categories.first { $0.typeEnum == selectedType }
+        }
+    }
+
+    func typeChanged(to newType: TransactionType, categories: [Category]) {
+        if newType != .transfer {
+            selectedCategory = categories.first { $0.typeEnum == newType }
+            selectedSubCategory = nil
+            splitItems = []
+        }
+    }
+
+    func categoryChanged() {
+        selectedSubCategory = nil
+    }
+
+    func addSplitItem() {
+        guard let amount = Double(amountString), amount > 0, let category = selectedCategory else {
+            return
+        }
+
+        let title = note.isEmpty ? (category.name ?? "") : note
+        let item = SplitItemData(
+            title: title,
+            amount: amount,
+            category: category,
+            subCategory: selectedSubCategory
+        )
+
+        splitItems.append(item)
+        amountString = "0"
+        note = ""
+
+        // Haptic feedback
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    func saveTransaction() async {
+        startLoading()
+
+        do {
+            // Add final item to split if needed
+            if !splitItems.isEmpty, let amount = Double(amountString), amount > 0, let category = selectedCategory {
+                let lastItem = SplitItemData(
+                    title: note.isEmpty ? (category.name ?? "") : note,
+                    amount: amount,
+                    category: category,
+                    subCategory: selectedSubCategory
+                )
+                splitItems.append(lastItem)
+            }
+
+            // Validation
+            try validationService.validateTransaction(
+                amount: totalAmount,
+                type: selectedType,
+                account: selectedAccount,
+                category: selectedCategory,
+                toAccount: toAccount
+            )
+
+            guard let account = selectedAccount else {
+                throw ValidationError.missingAccount
+            }
+
+            // Handle transfer separately
+            if selectedType == .transfer, let destAccount = toAccount {
+                _ = try await transferService.createTransfer(
+                    amount: totalAmount,
+                    date: transactionDate,
+                    from: account,
+                    to: destAccount,
+                    notes: note.isEmpty ? nil : note
+                )
+            } else {
+                // Regular transaction or split transaction
+                let title = splitItems.isEmpty
+                    ? (note.isEmpty ? (selectedCategory?.name ?? "Transaction") : note)
+                    : "Split Transaction (\(splitItems.count) Items)"
+
+                let transaction = try transactionRepository.createTransaction(
+                    title: title,
+                    amount: totalAmount,
+                    type: selectedType,
+                    date: transactionDate,
+                    account: account,
+                    category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
+                    subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
+                    notes: note.isEmpty ? nil : note
+                )
+
+                // Add split items if any
+                if !splitItems.isEmpty {
+                    try transactionRepository.addSplitItems(splitItems, to: transaction)
+                }
+
+                try transactionRepository.save()
+
+                // Recalculate balance
+                try await balanceService.recalculateBalances(for: account.objectID, from: transactionDate)
+            }
+
+            finishLoading()
+
+        } catch let error as ValidationError {
+            handleError(error)
+        } catch {
+            handleError(error)
+        }
+    }
+}

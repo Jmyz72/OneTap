@@ -12,11 +12,28 @@ struct Formatters {
     static let currency: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "MYR"
+        formatter.currencyCode = SettingsManager.shared.currencyCode
         formatter.maximumFractionDigits = 2
         formatter.minimumFractionDigits = 2
         return formatter
     }()
+    
+    private static var currencyFormatters: [String: NumberFormatter] = [:]
+    
+    static func currencyFormatter(for code: String) -> NumberFormatter {
+        if let formatter = currencyFormatters[code] {
+            return formatter
+        }
+        
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = code
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        
+        currencyFormatters[code] = formatter
+        return formatter
+    }
     
     static let date: DateFormatter = {
         let formatter = DateFormatter()
@@ -29,6 +46,13 @@ struct Formatters {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
         formatter.timeStyle = .none
+        return formatter
+    }()
+    
+    static let dateTime: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
         return formatter
     }()
     

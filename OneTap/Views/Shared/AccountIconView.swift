@@ -19,7 +19,9 @@ struct AccountIconView: View {
                 .fill(color.opacity(0.15))
                 .frame(width: size * 2.2, height: size * 2.2)
             
-            if UIImage(named: iconName) != nil {
+            // Optimization: SF Symbols usually contain dots (e.g. "creditcard.fill").
+            // Custom assets usually don't. Check for asset only if it might be one.
+            if !iconName.contains(".") && UIImage(named: iconName) != nil {
                 // It's a custom asset
                 Image(iconName)
                     .resizable()

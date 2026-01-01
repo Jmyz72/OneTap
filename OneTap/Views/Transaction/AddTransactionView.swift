@@ -2,292 +2,226 @@
 //  AddTransactionView.swift
 //  OneTap
 //
-//  Created by Jimmy Hew on 29/12/2025.
+//  REFACTORED: Now uses AddTransactionViewModel (MVVM pattern)
 //
 
 import SwiftUI
 import CoreData
 
 struct AddTransactionView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) private var dismiss
-    
+
+    @StateObject private var viewModel: AddTransactionViewModel
+
+    // Keep @FetchRequest only for UI display in pickers/grids
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Category.name, ascending: true)],
+        animation: .default
+    ) private var categories: FetchedResults<Category>
+
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Account.name, ascending: true)],
-        animation: .default)
-    private var accounts: FetchedResults<Account>
-    
-    @State private var title: String = ""
-    @State private var amount: String = ""
-    @State private var category: TransactionCategory = .food
-    @State private var date: Date = Date()
-    @State private var merchant: String = ""
-    @State private var isExpense: Bool = true
-    @State private var selectedAccount: Account?
-    
+        animation: .default
+    ) private var accounts: FetchedResults<Account>
+
+    // UI State for Sheets/Pickers (view-only state)
+    @State private var showingDatePicker = false
+    @State private var showingAccountPicker = false
+    @State private var showingToAccountPicker = false
+    @State private var showingSubCategoryPicker = false
+    @State private var showingNoteInput = false
+    @State private var showingSplitSheet = false
+
+    init() {
+        // Note: container is injected via @EnvironmentObject, but we can't access it in init
+        // So we create a temporary ViewModel that will be replaced on appear
+        let tempContainer = DependencyContainer()
+        _viewModel = StateObject(wrappedValue: tempContainer.makeAddTransactionViewModel())
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Type Selector
-                    HStack(spacing: 12) {
-                        TypeButton(
-                            title: "Expense",
-                            icon: "arrow.up.circle.fill",
-                            color: AppTheme.expense,
-                            isSelected: isExpense
-                        ) {
-                            isExpense = true
-                        }
-                        
-                        TypeButton(
-                            title: "Income",
-                            icon: "arrow.down.circle.fill",
-                            color: AppTheme.income,
-                            isSelected: !isExpense
-                        ) {
-                            isExpense = false
-                        }
-                    }
-                    
-                    // Amount Input
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Amount")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.textSecondary)
-                        
-                        HStack {
-                            Text("$")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            
-                            TextField("0.00", text: $amount)
-                                .font(.system(size: 32, weight: .bold))
-                                .foregroundColor(isExpense ? AppTheme.expense : AppTheme.income)
-                                .keyboardType(.decimalPad)
-                        }
-                        .padding(16)
-                        .background(AppTheme.secondaryBackground)
-                        .cornerRadius(12)
-                    }
-                    
-                    // Title Input
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Title")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.textSecondary)
-                        
-                        TextField("e.g., Grocery shopping", text: $title)
-                            .textFieldStyle(ModernTextFieldStyle())
-                    }
-                    
-                    // Category Selector
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Category")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.textSecondary)
-                        
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(TransactionCategory.allCases) { cat in
-                                    CategoryButton(
-                                        category: cat,
-                                        isSelected: category == cat
-                                    ) {
-                                        category = cat
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Account Selector (if accounts exist)
-                    if !accounts.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Account")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(AppTheme.textSecondary)
-                            
-                            Menu {
-                                Button("None") {
-                                    selectedAccount = nil
-                                }
-                                ForEach(accounts) { account in
-                                    Button(account.name ?? "Unknown") {
-                                        selectedAccount = account
-                                    }
-                                }
-                            } label: {
-                                HStack {
-                                    Text(selectedAccount?.name ?? "Select account (optional)")
-                                        .foregroundColor(selectedAccount == nil ? AppTheme.textTertiary : AppTheme.textPrimary)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.down")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(AppTheme.textTertiary)
-                                }
-                                .padding(16)
-                                .background(AppTheme.secondaryBackground)
-                                .cornerRadius(12)
-                            }
-                        }
-                    }
-                    
-                    // Date Picker
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Date")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.textSecondary)
-                        
-                        DatePicker("", selection: $date, displayedComponents: .date)
-                            .datePickerStyle(.compact)
-                            .labelsHidden()
-                            .padding(16)
-                            .background(AppTheme.secondaryBackground)
-                            .cornerRadius(12)
-                    }
-                    
-                    // Merchant Input (Optional)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Merchant (Optional)")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.textSecondary)
-                        
-                        TextField("e.g., Whole Foods", text: $merchant)
-                            .textFieldStyle(ModernTextFieldStyle())
-                    }
-                }
-                .padding(20)
+            ZStack {
+                AppTheme.background.ignoresSafeArea()
+                mainContent
             }
-            .background(AppTheme.background.ignoresSafeArea())
-            .navigationTitle("New Transaction")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(AppTheme.textSecondary)
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        saveTransaction()
-                    }
-                    .foregroundColor(AppTheme.accent)
-                    .fontWeight(.semibold)
-                    .disabled(title.isEmpty || amount.isEmpty)
+                    Button("Cancel") { dismiss() }
                 }
             }
-            .toolbarBackground(AppTheme.secondaryBackground, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-        }
-        .preferredColorScheme(.dark)
-    }
-    
-    private func saveTransaction() {
-        guard !title.isEmpty, let amountValue = Double(amount) else { return }
-        
-        withAnimation {
-            let newTransaction = Transaction(context: viewContext)
-            newTransaction.id = UUID()
-            newTransaction.title = title
-            // Store expense as negative, income as positive
-            newTransaction.amount = isExpense ? -amountValue : amountValue
-            newTransaction.category = category.rawValue
-            newTransaction.date = date
-            newTransaction.merchant = merchant.isEmpty ? nil : merchant
-            newTransaction.account = selectedAccount
-            
-            do {
-                try viewContext.save()
-                dismiss()
-            } catch {
-                let nsError = error as NSError
-                print("Error saving transaction: \(nsError), \(nsError.userInfo)")
+            .onAppear {
+                // Setup defaults with fetched data
+                viewModel.setupDefaults(accounts: Array(accounts), categories: Array(categories))
             }
-        }
-    }
-}
+            .onChange(of: viewModel.selectedType) { _, newValue in
+                viewModel.typeChanged(to: newValue, categories: Array(categories))
+            }
+            .onChange(of: viewModel.selectedCategory) { _, _ in
+                viewModel.categoryChanged()
+            }
+            .sheet(isPresented: $showingDatePicker) {
+                datePickerSheet
+            }
+            .sheet(isPresented: $showingAccountPicker) {
+                AccountPickerSheet(accounts: accounts, selectedAccount: $viewModel.selectedAccount)
+            }
+            .sheet(isPresented: $showingToAccountPicker) {
+                AccountPickerSheet(accounts: accounts, selectedAccount: $viewModel.toAccount, excludeId: viewModel.selectedAccount?.id)
+            }
+            .sheet(isPresented: $showingSplitSheet) {
+                splitSheetView
+            }
+            .confirmationDialog("Select Subcategory", isPresented: $showingSubCategoryPicker, titleVisibility: .visible) {
+                subcategoryButtons
+            }
+            .alert("Add Note", isPresented: $showingNoteInput) {
+                TextField("Note", text: $viewModel.note)
+                Button("Done") { }
+            }
+            // MVVM: Error handling
+            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                }
+            }
+            // MVVM: Loading overlay
+            .overlay {
+                if viewModel.loadingState.isLoading {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
 
-struct TypeButton: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+                    }
+                }
             }
-            .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(isSelected ? color : AppTheme.secondaryBackground)
-            .cornerRadius(12)
+            // MVVM: Auto-dismiss on success
+            .onChange(of: viewModel.loadingState) { _, newState in
+                if newState == .loaded {
+                    dismiss()
+                }
+            }
         }
     }
-}
 
-struct CategoryButton: View {
-    let category: TransactionCategory
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
-                
-                Text(category.rawValue)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
-            }
-            .frame(width: 90, height: 80)
-            .background(isSelected ? categoryColor : AppTheme.secondaryBackground)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? categoryColor : Color.white.opacity(0.1), lineWidth: isSelected ? 2 : 1)
+    // MARK: - Subviews
+
+    @ViewBuilder
+    private var mainContent: some View {
+        VStack(spacing: 0) {
+            TransactionTypePicker(selectedType: $viewModel.selectedType)
+
+            topSelectionView
+
+            Spacer()
+
+            TransactionMiddleBar(
+                selectedCategory: $viewModel.selectedCategory,
+                selectedSubCategory: $viewModel.selectedSubCategory,
+                selectedAccount: $viewModel.selectedAccount,
+                transactionDate: $viewModel.transactionDate,
+                splitItems: $viewModel.splitItems,
+                note: $viewModel.note,
+                selectedType: viewModel.selectedType,
+                onSubCategoryTap: { showingSubCategoryPicker = true },
+                onAccountTap: { showingAccountPicker = true },
+                onDateTap: { showingDatePicker = true },
+                onSplitTap: { showingSplitSheet = true },
+                onNoteTap: { showingNoteInput = true }
+            )
+
+            TransactionAmountDisplay(
+                amountString: viewModel.amountString,
+                selectedAccount: viewModel.selectedAccount,
+                splitItems: viewModel.splitItems,
+                selectedType: viewModel.selectedType
+            )
+
+            keypadSection
+        }
+    }
+
+    @ViewBuilder
+    private var topSelectionView: some View {
+        if viewModel.selectedType == .transfer {
+            TransactionTransferSelector(
+                selectedAccount: viewModel.selectedAccount,
+                toAccount: viewModel.toAccount,
+                onSelectFrom: { showingAccountPicker = true },
+                onSelectTo: { showingToAccountPicker = true }
+            )
+        } else {
+            TransactionCategoryGrid(
+                categories: categories,
+                selectedType: viewModel.selectedType,
+                selectedCategory: $viewModel.selectedCategory
             )
         }
     }
-    
-    private var categoryColor: Color {
-        switch category {
-        case .food: return .orange
-        case .transport: return .blue
-        case .entertainment: return .purple
-        case .shopping: return .pink
-        case .bills: return .red
-        case .health: return .green
-        case .salary: return AppTheme.income
-        case .investment: return .indigo
-        case .other: return .gray
+
+    private var keypadSection: some View {
+        VStack {
+            CustomKeypad(
+                value: $viewModel.amountString,
+                onDone: {
+                    Task {
+                        await viewModel.saveTransaction()
+                    }
+                },
+                onAddItem: viewModel.selectedType == .expense ? {
+                    viewModel.addSplitItem()
+                } : nil
+            )
+        }
+        .padding(.bottom, 10)
+    }
+
+    @ViewBuilder
+    private var subcategoryButtons: some View {
+        if let category = viewModel.selectedCategory,
+           let subs = category.subCategories?.allObjects as? [SubCategory] {
+            ForEach(subs.sorted { $0.order < $1.order }) { sub in
+                Button(sub.name ?? "Unnamed") {
+                    viewModel.selectedSubCategory = sub
+                }
+            }
+            Button("None") {
+                viewModel.selectedSubCategory = nil
+            }
         }
     }
-}
 
-struct ModernTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .padding(16)
-            .background(AppTheme.secondaryBackground)
-            .cornerRadius(12)
-            .foregroundColor(AppTheme.textPrimary)
+    private var datePickerSheet: some View {
+        VStack {
+            DatePicker("Date", selection: $viewModel.transactionDate, displayedComponents: [.date, .hourAndMinute])
+                .datePickerStyle(.graphical)
+                .padding()
+            Button("Done") { showingDatePicker = false }
+                .buttonStyle(.borderedProminent)
+                .padding()
+        }
+        .presentationDetents([.medium])
+    }
+
+    @ViewBuilder
+    private var splitSheetView: some View {
+        SplitTransactionSheet(
+            items: $viewModel.splitItems,
+            currencyCode: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+        )
     }
 }
 
 #Preview {
     AddTransactionView()
-        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+        .environmentObject(DependencyContainer(persistenceController: .preview))
 }
