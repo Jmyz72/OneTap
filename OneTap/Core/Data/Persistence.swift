@@ -7,13 +7,24 @@
 
 import CoreData
 
-struct PersistenceController {
+class PersistenceController {
     static let shared = PersistenceController()
 
     @MainActor
     static let preview: PersistenceController = {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
+        
+        // Seed default categories
+        Category.seedDefaults(context: viewContext)
+        
+        // Fetch categories for later use
+        let categoryFetchRequest: NSFetchRequest<Category> = Category.fetchRequest()
+        let categories = (try? viewContext.fetch(categoryFetchRequest)) ?? []
+        
+        let foodCategory = categories.first(where: { $0.name == "Food & Drinks" })
+        let transportCategory = categories.first(where: { $0.name == "Transport" })
+        let salaryCategory = categories.first(where: { $0.name == "Salary" })
         
         // Create sample accounts
         let checkingAccount = Account(context: viewContext)
@@ -44,30 +55,39 @@ struct PersistenceController {
         creditCard.createdAt = Date()
         
         // Create sample transactions
-        let sampleData: [(title: String, amount: Double, category: TransactionCategory, merchant: String, daysAgo: Int, account: Account?)] = [
-            ("Dinner at Pavilion", -85.43, .food, "Dining Co", 0, checkingAccount),
-            ("Monthly Salary", 4500.00, .salary, "Corporate HQ", 1, checkingAccount),
-            ("Grab to Office", -15.20, .transport, "Grab", 2, creditCard),
-            ("Netflix Subscription", -55.00, .entertainment, "Netflix", 3, creditCard),
-            ("Uniqlo Shopping", -199.99, .shopping, "Uniqlo", 4, creditCard),
-            ("TNB Bill", -120.50, .bills, "TNB", 5, checkingAccount),
-            ("Gym Membership", -150.00, .health, "Celebrity Fitness", 7, checkingAccount),
-            ("Tealive", -7.75, .food, "Tealive", 8, creditCard),
-            ("Dividends", 125.00, .investment, "Maybank", 10, savingsAccount),
-            ("Gas Station", -90.00, .transport, "Petronas", 12, checkingAccount)
-        ]
+        let t1 = Transaction(context: viewContext)
+        t1.id = UUID()
+        t1.title = "Nasi Lemak"
+        t1.amount = 12.50
+        t1.date = Calendar.current.date(bySettingHour: 8, minute: 30, second: 0, of: Date())
+        t1.type = TransactionType.expense.rawValue
+        t1.account = checkingAccount
+        t1.category = foodCategory
+        t1.createdAt = Date()
+        t1.updatedAt = Date()
         
-        for data in sampleData {
-            let newTransaction = Transaction(context: viewContext)
-            newTransaction.id = UUID()
-            newTransaction.title = data.title
-            newTransaction.amount = data.amount
-            newTransaction.category = data.category.rawValue
-            newTransaction.date = Calendar.current.date(byAdding: .day, value: -data.daysAgo, to: Date())
-            newTransaction.merchant = data.merchant
-            newTransaction.account = data.account
-        }
+        let t2 = Transaction(context: viewContext)
+        t2.id = UUID()
+        t2.title = "Petrol"
+        t2.amount = 80.00
+        t2.date = Calendar.current.date(bySettingHour: 18, minute: 15, second: 0, of: Date().addingTimeInterval(-86400))
+        t2.type = TransactionType.expense.rawValue
+        t2.account = creditCard
+        t2.category = transportCategory
+        t2.createdAt = Date()
+        t2.updatedAt = Date()
         
+        let t3 = Transaction(context: viewContext)
+        t3.id = UUID()
+        t3.title = "Salary December"
+        t3.amount = 6500.00
+        t3.date = Date().addingTimeInterval(-86400 * 5)
+        t3.type = TransactionType.income.rawValue
+        t3.account = checkingAccount
+        t3.category = salaryCategory
+        t3.createdAt = Date()
+        t3.updatedAt = Date()
+
         do {
             try viewContext.save()
         } catch {
@@ -84,11 +104,59 @@ struct PersistenceController {
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         }
+        
+        // Enable lightweight migration
+        if let description = container.persistentStoreDescriptions.first {
+            description.shouldMigrateStoreAutomatically = true
+            description.shouldInferMappingModelAutomatically = true
+        }
+        
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
-                fatalError("Unresolved error \(error), \(error.userInfo)")
+                // Development Recovery: If migration fails, delete the store and retry
+                // WARNING: This deletes user data. Acceptable for dev/beta phase if schema breaks.
+                if error.code == 134140 || error.domain == NSCocoaErrorDomain {
+                    do {
+                        let url = storeDescription.url!
+                        try self.container.persistentStoreCoordinator.destroyPersistentStore(at: url, ofType: storeDescription.type, options: nil)
+                        print("Migration failed. Persistent store destroyed. Recreating...")
+                        
+                        // Retry loading
+                        self.container.loadPersistentStores { _, retryError in
+                            if let retryError = retryError as NSError? {
+                                fatalError("Unresolved error after reset \(retryError), \(retryError.userInfo)")
+                            }
+                        }
+                    } catch {
+                        fatalError("Failed to destroy persistent store: \(error)")
+                    }
+                } else {
+                    fatalError("Unresolved error \(error), \(error.userInfo)")
+                }
             }
         })
         container.viewContext.automaticallyMergesChangesFromParent = true
+        
+        // Seed categories if empty
+        seedCategoriesIfEmpty()
     }
+    
+    private func seedCategoriesIfEmpty() {
+        let context = container.viewContext
+        let request: NSFetchRequest<Category> = Category.fetchRequest()
+        request.fetchLimit = 1
+
+        do {
+            let count = try context.count(for: request)
+            if count == 0 {
+                Category.seedDefaults(context: context)
+            }
+        } catch {
+            print("Error checking categories: \(error)")
+        }
+    }
+
+    // NOTE: Balance recalculation logic has been moved to BalanceService
+    // for better separation of concerns and testability.
+    // Use DependencyContainer.balanceService.recalculateBalances() instead.
 }

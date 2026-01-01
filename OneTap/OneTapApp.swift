@@ -10,12 +10,13 @@ import CoreData
 
 @main
 struct OneTapApp: App {
-    let persistenceController = PersistenceController.shared
+    @StateObject private var dependencyContainer = DependencyContainer()
 
     var body: some Scene {
         WindowGroup {
             MainTabView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environment(\.managedObjectContext, dependencyContainer.persistenceController.container.viewContext)
+                .environmentObject(dependencyContainer)
         }
     }
 }

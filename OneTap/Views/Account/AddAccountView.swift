@@ -9,6 +9,12 @@ import SwiftUI
 
 struct AddAccountView: View {
     @Environment(\.dismiss) private var dismiss
+    @Binding var isPresented: Bool
+    
+    // Default init for preview or when binding not strictly needed (though we enforce it now)
+    init(isPresented: Binding<Bool>) {
+        self._isPresented = isPresented
+    }
     
     var body: some View {
         NavigationStack {
@@ -16,7 +22,7 @@ struct AddAccountView: View {
                 ForEach(AccountTemplate.allGroups) { group in
                     Section(header: Text(group.group.rawValue)) {
                         ForEach(group.templates) { template in
-                            NavigationLink(destination: AccountFormView(template: template)) {
+                            NavigationLink(destination: AccountFormView(rootIsPresented: $isPresented, template: template)) {
                                 HStack(spacing: 12) {
                                     AccountIconView(
                                         iconName: template.displayIcon,
@@ -42,7 +48,7 @@ struct AddAccountView: View {
                 
                 // Option to create a custom account manually
                 Section {
-                    NavigationLink(destination: AccountFormView(template: nil)) {
+                    NavigationLink(destination: AccountFormView(rootIsPresented: $isPresented, template: nil)) {
                         HStack(spacing: 12) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title2)
@@ -62,7 +68,7 @@ struct AddAccountView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        isPresented = false
                     }
                 }
             }

@@ -2,157 +2,154 @@
 //  AccountFormView.swift
 //  OneTap
 //
-//  Created by Jimmy Hew on 29/12/2025.
+//  REFACTORED: Now uses AccountFormViewModel (MVVM pattern)
 //
 
 import SwiftUI
 import CoreData
 
 struct AccountFormView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) private var dismiss
-    
-    // Optional template to pre-fill data
-    var template: AccountTemplate?
-    // Optional account to edit
-    var accountToEdit: Account?
-    
-    @State private var name: String = ""
-    @State private var institution: String = ""
-    @State private var type: AccountType = .checking
-    @State private var balance: String = ""
-    @State private var creditLimit: String = ""
-    @State private var currency: String = SettingsManager.shared.currencyCode
-    @State private var billingDay: Int = 1
-    @State private var dueDay: Int = 1
-    @State private var icon: String = "creditcard.fill"
-    
+
+    // Optional binding to dismiss the parent sheet
+    var rootIsPresented: Binding<Bool>?
+
+    @StateObject private var viewModel: AccountFormViewModel
+
     let currencies = SettingsManager.shared.availableCurrencies
     let days = Array(1...31)
-    
+
+    init(template: AccountTemplate? = nil, accountToEdit: Account? = nil, rootIsPresented: Binding<Bool>? = nil) {
+        self.rootIsPresented = rootIsPresented
+        // Create temporary container and ViewModel
+        let tempContainer = DependencyContainer()
+        _viewModel = StateObject(wrappedValue: tempContainer.makeAccountFormViewModel(account: accountToEdit, template: template))
+    }
+
     var body: some View {
         Form {
             Section(header: Text("Details")) {
                 // Icon Preview
                 HStack {
                     Spacer()
-                    AccountIconView(iconName: icon, color: type.color, size: 40)
+                    AccountIconView(iconName: viewModel.icon, color: viewModel.type.color, size: 40)
                     Spacer()
                 }
                 .padding(.vertical, 8)
-                
-                TextField("Account Name", text: $name)
-                TextField("Institution (Optional)", text: $institution)
-                Picker("Type", selection: $type) {
+
+                TextField("Account Name", text: $viewModel.name)
+                TextField("Institution (Optional)", text: $viewModel.institution)
+                Picker("Type", selection: $viewModel.type) {
                     ForEach(AccountType.allCases) { type in
                         Text(type.rawValue).tag(type)
                     }
                 }
-                Picker("Currency", selection: $currency) {
+                Picker("Currency", selection: $viewModel.currency) {
                     ForEach(currencies, id: \.self) { code in
                         Text(code).tag(code)
                     }
                 }
             }
-            
+
             Section(header: Text("Financials")) {
                 HStack {
-                    Text(currency)
+                    Text(viewModel.currency)
                         .foregroundStyle(.secondary)
-                    TextField("Current Balance", text: $balance)
+                    TextField("Current Balance", text: $viewModel.balance)
                         .keyboardType(.decimalPad)
                 }
-                
-                if type == .creditCard || type == .bnpl {
+
+                if viewModel.type == .creditCard || viewModel.type == .bnpl {
                     HStack {
-                        Text(currency)
+                        Text(viewModel.currency)
                             .foregroundStyle(.secondary)
-                        TextField("Credit Limit", text: $creditLimit)
+                        TextField("Credit Limit", text: $viewModel.creditLimit)
                             .keyboardType(.decimalPad)
                     }
-                    
-                    Picker("Billing Cycle Date", selection: $billingDay) {
+
+                    Picker("Billing Cycle Date", selection: $viewModel.billingDay) {
                         ForEach(days, id: \.self) { day in
                             Text("Day \(day)").tag(day)
                         }
                     }
-                    
-                    Picker("Payment Due Date", selection: $dueDay) {
+
+                    Picker("Payment Due Date", selection: $viewModel.dueDay) {
                         ForEach(days, id: \.self) { day in
                             Text("Day \(day)").tag(day)
                         }
                     }
                 }
             }
+
+            Section(header: Text("Card Info")) {
+                Toggle("Have Card?", isOn: $viewModel.hasCard)
+
+                if viewModel.hasCard {
+                    TextField("Last 4 Digits", text: $viewModel.lastFourDigits)
+                        .keyboardType(.numberPad)
+                        .onChange(of: viewModel.lastFourDigits) { oldValue, newValue in
+                            if newValue.count > 4 {
+                                viewModel.lastFourDigits = String(newValue.prefix(4))
+                            }
+                        }
+                }
+            }
         }
-        .navigationTitle(accountToEdit != nil ? "Edit Account" : (template != nil ? "Add \(template!.name)" : "Add Account"))
+        .navigationTitle(viewModel.isEditing ? "Edit Account" : (viewModel.template != nil ? "Add \(viewModel.template!.name)" : "Add Account"))
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    saveAccount()
+                    Task {
+                        await viewModel.saveAccount()
+                    }
                 }
-                .disabled(name.isEmpty || balance.isEmpty)
+                .disabled(!viewModel.isValid || viewModel.loadingState.isLoading)
             }
         }
-        .onAppear {
-            if let account = accountToEdit {
-                name = account.name ?? ""
-                institution = account.institution ?? ""
-                type = account.typeEnum
-                currency = account.currency ?? SettingsManager.shared.currencyCode
-                balance = String(format: "%.2f", account.balance)
-                creditLimit = String(format: "%.2f", account.creditLimit)
-                billingDay = account.billingDay > 0 ? account.billingDay : 1
-                dueDay = account.dueDay > 0 ? account.dueDay : 1
-                icon = account.icon ?? type.icon
-            } else if let template = template {
-                name = template.name
-                institution = template.institution
-                type = template.type
-                icon = template.displayIcon
-            } else {
-                // Manual add
-                icon = type.icon
+        .onChange(of: viewModel.type) { _, newType in
+            viewModel.typeChanged(to: newType)
+        }
+        // MVVM: Error handling
+        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            if let error = viewModel.errorMessage {
+                Text(error)
             }
         }
-        .onChange(of: type) { oldType, newType in
-            // Only update icon if it was a default system icon, preserve custom image if set
-            if template == nil && UIImage(named: icon) == nil {
-                 icon = newType.icon
+        // MVVM: Loading overlay
+        .overlay {
+            if viewModel.loadingState.isLoading {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                }
+            }
+        }
+        // MVVM: Auto-dismiss on success
+        .onChange(of: viewModel.loadingState) { _, newState in
+            if newState == .loaded {
+                // If root binding is provided (Add Account flow), dismiss parent sheet
+                if let rootIsPresented = rootIsPresented {
+                    rootIsPresented.wrappedValue = false
+                } else {
+                    dismiss()
+                }
             }
         }
     }
-    
-    private func saveAccount() {
-        let account = accountToEdit ?? Account(context: viewContext)
-        
-        if accountToEdit == nil {
-            account.id = UUID()
-            account.createdAt = Date()
-        }
-        
-        account.name = name
-        account.institution = institution
-        account.type = type.rawValue
-        account.currency = currency
-        account.balance = Double(balance) ?? 0.0
-        account.creditLimit = Double(creditLimit) ?? 0.0
-        account.icon = icon
-        
-        if type == .creditCard || type == .bnpl {
-            account.billingDay = billingDay
-            account.dueDay = dueDay
-        } else {
-            // Reset if changing type away from credit
-            account.billingDay = 0
-            account.dueDay = 0
-        }
-        
-        do {
-            try viewContext.save()
-            dismiss()
-        } catch {
-            print("Error saving account: \(error)")
-        }
+}
+
+#Preview {
+    NavigationStack {
+        AccountFormView()
+            .environmentObject(DependencyContainer(persistenceController: .preview))
     }
 }
