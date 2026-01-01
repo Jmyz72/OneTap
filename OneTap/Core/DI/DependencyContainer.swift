@@ -9,9 +9,12 @@
 import Foundation
 import SwiftUI
 import CoreData
+import Combine
 
 @MainActor
-class DependencyContainer: ObservableObject {
+final class DependencyContainer: ObservableObject {
+    nonisolated let objectWillChange = ObservableObjectPublisher()
+
     // MARK: - Core Data
     let persistenceController: PersistenceController
 
@@ -25,17 +28,18 @@ class DependencyContainer: ObservableObject {
     let transferService: TransferService
     let validationService: ValidationService
 
-    nonisolated init(persistenceController: PersistenceController = .shared) {
-        self.persistenceController = persistenceController
+    init(persistenceController: PersistenceController? = nil) {
+        let pc = persistenceController ?? PersistenceController.shared
+        self.persistenceController = pc
 
         // Initialize repositories
-        let context = persistenceController.container.viewContext
+        let context = pc.container.viewContext
         self.transactionRepository = TransactionRepository(context: context)
         self.accountRepository = AccountRepository(context: context)
         self.categoryRepository = CategoryRepository(context: context)
 
         // Initialize services
-        self.balanceService = BalanceService(container: persistenceController.container)
+        self.balanceService = BalanceService(container: pc.container)
         self.transferService = TransferService(
             transactionRepository: transactionRepository,
             balanceService: balanceService
