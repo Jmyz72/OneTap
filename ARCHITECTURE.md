@@ -8,306 +8,111 @@
 # OneTap Architecture Guide
 
 ## Overview
-OneTap follows a clean, modular architecture designed for scalability and maintainability. This document outlines the structure and design decisions.
+OneTap follows a robust **MVVM (Model-View-ViewModel)** architecture enhanced with **Repositories** and **Dependency Injection**. This structure ensures separation of concerns, testability, and scalability.
 
 ## Architecture Pattern
 
-### MVVM-Light with SwiftUI
-- **Views**: SwiftUI views (passive UI)
-- **Models**: Core Data entities + Swift enums/structs
-- **No explicit ViewModels**: Using SwiftUI's @FetchRequest and @State for simplicity
-- **Data Layer**: Core Data managed by PersistenceController
+### MVVM + Repository
+- **Views**: Passive SwiftUI views. They observe `ViewModels` and delegate user actions to them.
+- **ViewModels**: `ObservableObject` classes that manage UI state, handle business logic, and interact with Repositories/Services.
+- **Repositories**: Abstraction layer for Core Data. They handle CRUD operations and data fetching, returning standard Swift types or Combine publishers.
+- **Services**: Encapsulate complex business logic (e.g., `BalanceService`, `TransferService`) that spans multiple entities.
+- **Dependency Container**: A central factory that creates and injects dependencies (Repositories, Services, ViewModels).
 
 ## Folder Structure Explained
 
-### `/Models` - Data Models
-Contains domain models, enums, and Core Data entity extensions.
+### `/Models` - Domain Models
+Contains Core Data class extensions and pure Swift domain models.
+- `TransactionModel.swift`: `TransactionCategory` enum, helpers.
+- `AccountModel.swift`: `AccountType`, `AccountGroup`.
 
-**Current:**
-- `TransactionModel.swift`: Transaction categories, types, and extensions
-
-**Future additions:**
-- `AssetModel.swift`: Stock, crypto, real estate models
-- `BudgetModel.swift`: Budget and goal models
-- `AccountModel.swift`: Bank account models
+### `/ViewModels` - Presentation Logic
+One ViewModel per major View (or feature).
+- `TransactionListViewModel.swift`: Handles filtering, searching, and sectioning of transactions.
+- `AddTransactionViewModel.swift`: Manages form state and validation for new transactions.
+- `AccountFormViewModel.swift`: Logic for creating/editing accounts.
 
 ### `/Views` - User Interface
-All SwiftUI views organized by feature.
+SwiftUI views organized by feature.
+- **State**: Uses `@StateObject` for ViewModels injected via the DependencyContainer.
+- **Bindings**: Binds directly to ViewModel published properties (e.g., `$viewModel.title`).
 
-**Structure:**
-```
-Views/
-├── MainTabView.swift           # Root tab navigation
-├── ContentView.swift            # Transaction list (main screen)
-├── Transaction/                 # Transaction feature
-│   ├── AddTransactionView.swift
-│   ├── TransactionListView.swift
-│   └── (future) TransactionDetailView.swift
-├── Shared/                      # Reusable components
-│   └── TransactionRow.swift
-└── (future) Assets/, Budget/, etc.
-```
+### `/Core` - Application Core
 
-### `/Core` - Core Functionality
-Fundamental app functionality not tied to specific features.
+**DI/**
+- `DependencyContainer.swift`: The single source of truth for dependencies. Creates Repositories and Services, and acts as a factory for ViewModels.
 
-**Data/**
-- `Persistence.swift`: Core Data stack management
+**Repositories/**
+- `TransactionRepository.swift`: Fetches and persists transactions.
+- `AccountRepository.swift`: Manages account entities.
+- `BaseRepository.swift`: Common Core Data utilities.
 
-**Extensions/**
-- `FormattersExtension.swift`: Shared formatters
-
-**Future additions:**
-- `Core/Networking/`: API clients (if needed)
-- `Core/Services/`: Business logic services
-- `Core/Utilities/`: Helper functions
+**Services/**
+- `BalanceService.swift`: Recalculates account balances.
+- `TransferService.swift`: Handles logic for transfers (creating paired transactions).
 
 ## Data Flow
 
 ```
 User Action (View)
     ↓
-SwiftUI State/Binding
+ViewModel Method (e.g., `saveTransaction()`)
     ↓
-Core Data Context
+Service / Repository
     ↓
-Persistence Controller
+Core Data Context (PersistenceController)
     ↓
 SQLite Database
 ```
 
-### Adding a Transaction Example:
-1. User fills form in `AddTransactionView`
-2. User taps "Save" button
-3. View creates `Transaction` entity in Core Data context
-4. Context saves to persistent store
-5. `@FetchRequest` in `ContentView` automatically updates
-6. UI refreshes with new transaction
-
-## Core Data Model
-
-### Current Entities
-
-**Transaction**
-- Stores all financial transactions
-- Includes both income and expenses (distinguished by amount sign)
-- Linked to categories via String (future: relationship)
-
-### Future Entities
-
-**Asset** (for stocks, crypto, etc.)
-```
-- id: UUID
-- name: String
-- type: String (stock, crypto, real estate)
-- quantity: Double
-- purchasePrice: Double
-- currentPrice: Double
-- purchaseDate: Date
-```
-
-**Budget**
-```
-- id: UUID
-- category: String
-- amount: Double
-- period: String (monthly, yearly)
-- startDate: Date
-```
-
-**Account** (for multiple bank accounts)
-```
-- id: UUID
-- name: String
-- type: String (checking, savings, credit)
-- balance: Double
-- currency: String
-```
+### Data Updates (Reactive)
+1. Repository observes Core Data context changes.
+2. Repository publishes updated data via Combine `Publisher`.
+3. ViewModel subscribes to Repository publisher.
+4. ViewModel updates `@Published` properties.
+5. View updates automatically.
 
 ## Design Patterns
 
-### 1. Repository Pattern (via Core Data)
-- `PersistenceController` acts as repository
-- Views fetch data via `@FetchRequest`
-- No manual data synchronization needed
+### 1. Repository Pattern
+- Hides `NSFetchRequest` and `NSPredicate` complexity from ViewModels.
+- Allows for easier unit testing by mocking repositories.
 
 ### 2. Dependency Injection
-- Core Data context injected via `.environment(\.managedObjectContext)`
-- Easy to swap for testing (see `preview` controller)
+- `DependencyContainer` is injected into the environment: `.environmentObject(dependencyContainer)`.
+- Views request ViewModels from the container: `container.makeTransactionListViewModel()`.
 
-### 3. Reusable Components
-- `TransactionRow`: Reusable list item
-- `Formatters`: Centralized formatting logic
+### 3. Service Layer
+- Logic that involves multiple repositories (like a Transfer affecting two accounts) lives in a Service (`TransferService`), not in the ViewModel.
 
-### 4. Type Safety
-- `TransactionCategory` enum prevents typos
-- Compile-time guarantees for categories
+## Core Data Model
 
-## View Composition
+**Transaction**
+- `type`: Expense, Income, Transfer.
+- `account`: Relationship to `Account`.
+- `balanceAfter`: Snapshot of running balance.
 
-### Main Navigation Hierarchy
-```
-OneTapApp
-└── MainTabView
-    ├── TransactionsTab → ContentView
-    │   └── TransactionListView
-    │       └── TransactionRow (per transaction)
-    ├── OverviewTab (placeholder)
-    ├── AssetsTab (placeholder)
-    └── MoreTab (placeholder)
-```
-
-## State Management
-
-### Local State (@State)
-Used for temporary UI state within a view:
-- Form inputs in `AddTransactionView`
-- Sheet presentation flags
-
-### Environment State (@Environment)
-Shared app-wide state:
-- `\.managedObjectContext`: Core Data context
-- `\.dismiss`: Modal dismissal
-
-### Fetched Data (@FetchRequest)
-Automatic Core Data queries:
-- Keeps UI in sync with database
-- Supports predicates and sorting
-
-## Adding New Features
-
-### Example: Adding Stock Portfolio
-
-1. **Create Model**
-```swift
-// Models/AssetModel.swift
-enum AssetType: String {
-    case stock, crypto, realEstate
-}
-
-extension Asset {
-    var typeEnum: AssetType? { ... }
-    var totalValue: Double { quantity * currentPrice }
-}
-```
-
-2. **Update Core Data Model**
-Add `Asset` entity in `.xcdatamodeld`
-
-3. **Create Views**
-```
-Views/Asset/
-├── AssetListView.swift
-├── AddAssetView.swift
-└── AssetDetailView.swift
-```
-
-4. **Create Reusable Components**
-```
-Views/Shared/
-└── AssetRow.swift
-```
-
-5. **Update Tab**
-Replace placeholder in `MainTabView.swift`
+**Account**
+- `type`: Checking, Savings, Credit Card, etc.
+- `currentBalance`: Cached balance (updated by `BalanceService`).
 
 ## Best Practices
 
-### 1. File Organization
-- One view per file
-- Group related files in folders
-- Use descriptive names
+### 1. No Logic in Views
+- Avoid `@FetchRequest` for complex data.
+- Do not call `viewContext.save()` directly in Views.
+- Delegate all actions to the ViewModel.
 
-### 2. SwiftUI Views
-- Keep views small and focused
-- Extract subviews for clarity
-- Use view extensions for computed properties
+### 2. ViewModels own the State
+- Use `@Published` properties for form data.
+- Handle validation and error messages in the ViewModel.
 
-### 3. Core Data
-- Always handle save errors
-- Use background contexts for heavy operations
-- Test with preview data
+### 3. Centralized Navigation (Future)
+- Currently using `NavigationStack`, but moving towards a Coordinator pattern if complexity grows.
 
-### 4. Error Handling
-- User-friendly error messages
-- Graceful degradation
-- Log errors for debugging
+## Scalability
 
-## Testing Strategy
-
-### Preview Providers
-- Every view has `#Preview`
-- Use `PersistenceController.preview` for sample data
-
-### Unit Tests (future)
-- Test model logic
-- Test formatters
-- Test data transformations
-
-### UI Tests (future)
-- Test critical user flows
-- Test transaction creation
-- Test data persistence
-
-## Performance Considerations
-
-### Current Optimizations
-- Batch predicates in `@FetchRequest`
-- Lazy loading in `List`
-- Minimal view updates with `@FetchRequest`
-
-### Future Optimizations
-- Pagination for large datasets
-- Background context for imports
-- Image caching (if adding receipts)
-- Debouncing search queries
-
-## Scalability Plan
-
-### Phase 1: Foundation (Current)
-✅ Basic transaction tracking
-✅ Categories and organization
-✅ Clean architecture
-
-### Phase 2: Enhanced Features
-- [ ] Multiple accounts
-- [ ] Recurring transactions
-- [ ] Budget tracking
-- [ ] Search and filters
-
-### Phase 3: Advanced Features
-- [ ] Stock/crypto portfolio
-- [ ] Charts and analytics
-- [ ] Export/import
-- [ ] Cloud sync (optional)
-
-### Phase 4: Premium Features
-- [ ] Advanced analytics
-- [ ] Receipt scanning
-- [ ] Bill reminders
-- [ ] Financial insights
-
-## Dependencies
-
-### Current
-- SwiftUI (iOS 16+)
-- Core Data
-- Foundation
-
-### Potential Future Dependencies
-- Charts framework (for analytics)
-- PhotosUI (for receipt scanning)
-- CloudKit (for sync)
-- WidgetKit (for home screen widgets)
-
-## Conclusion
-
-This architecture provides:
-- ✅ Clean separation of concerns
-- ✅ Easy to add new features
-- ✅ Testable components
-- ✅ Scalable structure
-- ✅ Type-safe design
-- ✅ SwiftUI best practices
-
-All future features can follow the established patterns without major refactoring.
+This architecture supports:
+- **Unit Testing**: ViewModels and Services can be tested in isolation.
+- **Previews**: Easy to inject mock repositories/services for SwiftUI Previews.
+- **Feature Isolation**: distinct folders for Views and ViewModels make adding new features (like Budgeting) structured.

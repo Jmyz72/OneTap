@@ -3,154 +3,114 @@
 ```
 📦 OneTap/
 │
-├── 📱 OneTapApp.swift                    # App entry point
+├── 📱 OneTapApp.swift                    # App entry point, DI Container setup
 │
-├── 📁 Models/                            # Data models & business logic
-│   └── TransactionModel.swift           # Transaction categories & extensions
+├── 📁 Models/                            # Domain models & Core Data extensions
+│   ├── TransactionModel.swift           # Transaction categories & enums
+│   ├── AccountModel.swift               # Account types & logic
+│   ├── CategoryModel.swift              # Category entity extensions
+│   └── SubCategoryModel.swift
 │
-├── 📁 Views/                             # User interface
-│   ├── MainTabView.swift                # 4-tab navigation (root)
-│   ├── ContentView.swift                # Transaction list screen
+├── 📁 ViewModels/                        # Presentation Logic (MVVM)
+│   ├── TransactionListViewModel.swift   # Filtering & Search logic
+│   ├── AddTransactionViewModel.swift    # Form validation & saving
+│   ├── AccountListViewModel.swift
+│   ├── AccountFormViewModel.swift
+│   └── ... (One per major view)
+│
+├── 📁 Views/                             # User interface (SwiftUI)
+│   ├── MainTabView.swift                # Root navigation
 │   │
 │   ├── 📁 Transaction/                  # Transaction feature
-│   │   ├── AddTransactionView.swift    # Create new transaction
-│   │   └── TransactionListView.swift   # Reusable transaction list
+│   │   ├── AddTransactionView.swift
+│   │   ├── TransactionListView.swift
+│   │   ├── EditTransactionView.swift
+│   │   └── ...
+│   │
+│   ├── 📁 Account/                      # Account feature
+│   │   ├── AccountListView.swift
+│   │   ├── AccountFormView.swift
+│   │   └── ...
+│   │
+│   ├── 📁 Settings/                     # Settings & Metadata
+│   │   ├── CategoryListView.swift
+│   │   └── ...
 │   │
 │   └── 📁 Shared/                       # Reusable UI components
-│       └── TransactionRow.swift         # Transaction list item
+│       ├── TransactionRow.swift
+│       ├── AccountRow.swift
+│       └── ...
 │
-├── 📁 Core/                              # Core functionality
-│   ├── 📁 Data/                         # Data layer
-│   │   └── Persistence.swift            # Core Data stack
+├── 📁 Core/                              # Core Application Logic
+│   ├── 📁 DI/                           # Dependency Injection
+│   │   └── DependencyContainer.swift    # ViewModel Factory & Service Holder
 │   │
-│   └── 📁 Extensions/                   # Swift extensions
-│       └── FormattersExtension.swift    # Formatters (currency, dates)
+│   ├── 📁 Data/                         # Data Layer
+│   │   └── Persistence.swift            # Core Data Stack
+│   │
+│   ├── 📁 Repositories/                 # Data Access Layer
+│   │   ├── TransactionRepository.swift
+│   │   ├── AccountRepository.swift
+│   │   ├── CategoryRepository.swift
+│   │   └── BaseRepository.swift
+│   │
+│   ├── 📁 Services/                     # Business Logic Layer
+│   │   ├── BalanceService.swift         # Running balance calculation
+│   │   ├── TransferService.swift        # Account transfers
+│   │   └── ValidationService.swift
+│   │
+│   ├── 📁 Extensions/                   # Swift extensions
+│   │   └── FormattersExtension.swift
+│   │
+│   └── 📁 Theme/                        # Design System
+│       ├── AppTheme.swift
+│       └── IconLibrary.swift
 │
-├── 📁 OneTap.xcdatamodeld/              # Core Data model
-│   └── OneTap.xcdatamodel/
-│       └── contents                      # Transaction entity
-│
-└── 📁 Assets.xcassets/                   # Images & colors
-    ├── AccentColor.colorset/
-    └── AppIcon.appiconset/
+├── 📁 OneTap.xcdatamodeld/              # Core Data Schema
+└── 📁 Assets.xcassets/                   # Images & Colors
 ```
 
-## Tab Structure
+## Module Responsibilities
 
-```
-MainTabView
-├── 📊 Transactions Tab → ContentView
-│   └── Shows all transactions
-│
-├── 📈 Overview Tab (Placeholder)
-│   └── Future: Analytics & insights
-│
-├── 💰 Assets Tab (Placeholder)
-│   └── Future: Stocks, crypto, real estate
-│
-└── ⋯ More Tab (Placeholder)
-    └── Future: Settings, export, preferences
-```
+| Module | Responsibility |
+|--------|----------------|
+| **Views** | Display UI, observe ViewModel, capture user input. Passive. |
+| **ViewModels** | Manage UI state (`@Published`), handle user actions, call Services/Repositories. |
+| **Repositories** | CRUD operations on Core Data entities. Hide `NSFetchRequest` details. |
+| **Services** | Complex business rules (e.g., Transfer logic, Balance updates). |
+| **DependencyContainer** | Creates and holds singletons (Repositories, Services). Acts as a Factory. |
 
-## Data Flow
-
-```
-User Input
-    ↓
-SwiftUI View (@State, @Binding)
-    ↓
-Core Data Context (via @Environment)
-    ↓
-PersistenceController
-    ↓
-SQLite Database
-    ↓
-@FetchRequest (automatic updates)
-    ↓
-UI Updates
-```
-
-## Feature Expansion Plan
+## Feature Status
 
 ### 🟢 Phase 1: Foundation (COMPLETE)
-- ✅ Transaction tracking
-- ✅ Categories with icons
-- ✅ Add/Delete transactions
-- ✅ Clean architecture
-- ✅ Core Data setup
-- ✅ Tab navigation structure
+- ✅ Transaction Tracking (Add, Edit, Delete)
+- ✅ Category Management
+- ✅ Core Data Persistence
+- ✅ MVVM Architecture
 
-### 🔵 Phase 2: Enhanced Transactions
-Add to `/Views/Transaction/`:
-- [ ] `TransactionDetailView.swift` - View/edit individual transactions
-- [ ] `TransactionFilterView.swift` - Filter by category/date
-- [ ] `RecurringTransactionView.swift` - Setup recurring transactions
+### 🟢 Phase 2: Account Management (COMPLETE)
+- ✅ Multiple Accounts (Checking, Cash, Credit)
+- ✅ Transfers between accounts
+- ✅ Running Balance calculation
 
-### 🟡 Phase 3: Budget Tracking
-Create `/Views/Budget/`:
-- [ ] `BudgetListView.swift` - View all budgets
-- [ ] `AddBudgetView.swift` - Create new budget
-- [ ] `BudgetDetailView.swift` - Budget progress & insights
-- [ ] Create `BudgetModel.swift` in `/Models/`
-- [ ] Add Budget entity to Core Data
+### 🔵 Phase 3: Budget Tracking (PLANNED)
+- [ ] Budget Models
+- [ ] Budget Repositories
+- [ ] Budget vs Actual Views
 
-### 🟠 Phase 4: Asset Management
-Create `/Views/Asset/`:
-- [ ] `AssetListView.swift` - View all assets
-- [ ] `AddAssetView.swift` - Add stock/crypto/property
-- [ ] `AssetDetailView.swift` - Asset performance
-- [ ] Create `AssetModel.swift` in `/Models/`
-- [ ] Add Asset entity to Core Data
+### 🟡 Phase 4: Asset Management (PLANNED)
+- [ ] Stock/Crypto tracking
+- [ ] Asset Portfolio Views
 
-### 🟣 Phase 5: Analytics & Overview
-Update `OverviewTab` with:
-- [ ] `DashboardView.swift` - Financial overview
-- [ ] `ChartViews.swift` - Spending charts
-- [ ] `InsightsView.swift` - AI-powered insights
-- [ ] Create `/Core/Analytics/` folder
-
-### 🔴 Phase 6: Advanced Features
-- [ ] Multiple accounts support
-- [ ] Data export/import
-- [ ] Receipt scanning
-- [ ] Cloud sync (optional)
-- [ ] Widgets
-
-## When to Add New Folders
-
-| Add Folder | When You Need... |
-|------------|------------------|
-| `/Models/AssetModel.swift` | Stock/crypto tracking |
-| `/Models/BudgetModel.swift` | Budget management |
-| `/Models/AccountModel.swift` | Multiple bank accounts |
-| `/Views/Budget/` | Budget-related views |
-| `/Views/Asset/` | Asset-related views |
-| `/Views/Reports/` | Reports & analytics |
-| `/Core/Services/` | Business logic services |
-| `/Core/Networking/` | API integrations |
-| `/Core/Utilities/` | Helper functions |
+### 🟠 Phase 5: Analytics (PLANNED)
+- [ ] Charts and Graphs
+- [ ] Spending Trends
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `OneTapApp.swift` | App entry, Core Data setup |
-| `MainTabView.swift` | Root navigation |
-| `ContentView.swift` | Main transactions screen |
-| `AddTransactionView.swift` | Add transaction form |
-| `TransactionRow.swift` | Reusable list item |
-| `TransactionModel.swift` | Categories & extensions |
-| `Persistence.swift` | Core Data management |
-| `FormattersExtension.swift` | Shared formatters |
-
-## Documentation Files
-
-- `README.md` - Project overview & features
-- `ARCHITECTURE.md` - Detailed architecture explanation
-- `DEVELOPMENT_GUIDE.md` - Quick reference for developers
-- `PROJECT_STRUCTURE.md` - This file
-
----
-
-**Last Updated:** December 29, 2025
-**Version:** 1.0.0
+| `DependencyContainer.swift` | **Start here.** Shows all available services and repositories. |
+| `TransactionRepository.swift` | Example of how data is fetched. |
+| `TransactionListViewModel.swift` | Example of clean presentation logic. |
+| `AddTransactionView.swift` | Example of a refactored MVVM View. |

@@ -1,110 +1,70 @@
 # OneTap - Personal Finance iOS App
 
-A modern SwiftUI-based personal finance tracking app with Core Data persistence.
+A modern, scalable SwiftUI-based personal finance tracking app using **MVVM** and **Core Data**.
 
 ## 🏗️ Project Structure
 
+The project follows a clean **MVVM + Repository** architecture:
+
 ```
 OneTap/
-├── OneTapApp.swift              # App entry point with MainTabView
-├── Models/                       # Data models and enums
-│   └── TransactionModel.swift   # Transaction category enum and extensions
-├── Views/                        # SwiftUI views
-│   ├── MainTabView.swift        # Main tab navigation (4 tabs)
-│   ├── ContentView.swift        # Transaction list screen
-│   ├── Transaction/             # Transaction-related views
-│   │   ├── AddTransactionView.swift
-│   │   └── TransactionListView.swift
-│   └── Shared/                  # Reusable components
-│       └── TransactionRow.swift # Transaction list item view
-├── Core/                         # Core functionality
-│   ├── Data/                    # Data persistence
-│   │   └── Persistence.swift   # Core Data stack
-│   └── Extensions/              # Swift extensions
-│       └── FormattersExtension.swift # Currency & date formatters
-└── OneTap.xcdatamodeld/         # Core Data model
-    └── OneTap.xcdatamodel/
-        └── contents             # Transaction entity definition
+├── ViewModels/               # Presentation Logic
+├── Views/                    # SwiftUI Views
+├── Core/
+│   ├── Repositories/         # Data Access Layer
+│   ├── Services/             # Business Logic (Balance, Transfers)
+│   └── DI/                   # Dependency Injection
+└── Models/                   # Domain Models
 ```
 
-## ✨ Current Features
+## ✨ Features
 
 ### Transaction Management
-- ✅ Add new transactions (expense/income)
-- ✅ View transaction list (sorted by date)
-- ✅ Delete transactions (swipe to delete)
-- ✅ Transaction categories with icons and colors
-- ✅ Optional merchant field
-- ✅ Core Data persistence
+- ✅ Add, Edit, Delete Transactions
+- ✅ Split Transactions (Multiple categories per transaction)
+- ✅ Search and Filter (Date, Category, Text)
+- ✅ Recurring Transactions (Foundation laid)
 
-### UI Components
-- ✅ Tab-based navigation (4 tabs)
-- ✅ Empty state handling
-- ✅ Category icons and color coding
-- ✅ Currency formatting
-- ✅ Date formatting
+### Account Management
+- ✅ Multiple Accounts (Checking, Savings, Credit Card, Cash)
+- ✅ **Transfers** between accounts
+- ✅ **Running Balance** tracking
+- ✅ Account Grouping (Liquid, Credit, etc.)
 
-### Transaction Categories
-- Food 🍴
-- Transport 🚗
-- Entertainment 🎬
-- Shopping 🛒
-- Bills 📄
-- Health ❤️
-- Salary 💰
-- Investment 📈
-- Other ⋯
+### Organization
+- ✅ Custom Categories with Icons and Colors
+- ✅ Sub-categories support
 
-## 🔮 Future Features (Placeholders Created)
+### UI/UX
+- ✅ Modern SwiftUI Interface
+- ✅ Dark Mode Support
+- ✅ Haptic Feedback
+- ✅ Native iOS Look & Feel
 
-### Overview Tab
-- [ ] Financial analytics dashboard
-- [ ] Spending trends
-- [ ] Income vs expenses charts
-- [ ] Monthly/yearly summaries
+## 🔮 Roadmap
 
-### Assets Tab
-- [ ] Stock portfolio tracking
-- [ ] Cryptocurrency holdings
-- [ ] Real estate tracking
-- [ ] Other investment assets
+### Phase 3: Budgeting (Next)
+- [ ] Monthly Budgets per Category
+- [ ] Progress Bars and Alerts
 
-### More Tab
-- [ ] User preferences
-- [ ] Category management
-- [ ] Data export/import
-- [ ] Currency settings
-- [ ] Backup & restore
+### Phase 4: Assets
+- [ ] Stock and Crypto tracking
+- [ ] Net Worth History
 
-## 🎨 Design Principles
-
-1. **Clean Architecture**: Organized folder structure for scalability
-2. **Reusable Components**: Shared views and utilities
-3. **Type Safety**: Enums for categories with compile-time checks
-4. **Preview Support**: All views have SwiftUI previews
-5. **Core Data**: Local persistence with proper error handling
-6. **Modern SwiftUI**: NavigationStack, @FetchRequest, environment values
-
-## 📱 Core Data Model
-
-### Transaction Entity
-- `id`: UUID (unique identifier)
-- `title`: String (required)
-- `amount`: Double (required, positive for expenses, negative for income)
-- `category`: String (required)
-- `date`: Date (required)
-- `merchant`: String (optional)
+### Phase 5: Analytics
+- [ ] Visual Charts (Swift Charts)
+- [ ] Monthly Reports
 
 ## 🚀 Getting Started
 
-1. Open `OneTap.xcodeproj` in Xcode
-2. Select a simulator or device
-3. Run the app (⌘R)
-4. Use the "+" button to add transactions
+1. Open `OneTap.xcodeproj` in Xcode.
+2. Select a simulator (iOS 16+).
+3. Run (⌘R).
 
-## 📝 Notes
+## 🛠 Tech Stack
 
-- All data is stored locally using Core Data
-- No networking or authentication required
-- Sample data is provided in preview mode
-- The app follows Apple's Human Interface Guidelines
+- **Language**: Swift 5
+- **UI Framework**: SwiftUI
+- **Persistence**: Core Data
+- **Architecture**: MVVM + Repository + Dependency Injection
+- **Concurrency**: Swift Async/Await
