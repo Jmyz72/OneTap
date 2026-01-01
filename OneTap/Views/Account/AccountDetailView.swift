@@ -2,34 +2,44 @@
 //  AccountDetailView.swift
 //  OneTap
 //
-//  Created by Jimmy Hew on 29/12/2025.
+//  REFACTORED: Now uses AccountDetailViewModel (MVVM pattern)
 //
 
 import SwiftUI
 import CoreData
 
 struct AccountDetailView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) var dismiss
-    
-    @ObservedObject var account: Account
+
+    let account: Account
+    @StateObject private var viewModel: AccountDetailViewModel
+
+    // UI State (view-only state)
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
-    
+
+    init(account: Account) {
+        self.account = account
+        // Create temporary container and ViewModel
+        let tempContainer = DependencyContainer()
+        _viewModel = StateObject(wrappedValue: tempContainer.makeAccountDetailViewModel(account: account))
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 // Account Header Card
                 accountHeaderCard
-                
+
                 // Credit Card Visualization (if available)
                 if let last4 = account.lastFourDigits, !last4.isEmpty {
                     creditCardView(last4: last4)
                 }
-                
+
                 // Quick Stats
                 quickStatsCard
-                
+
                 // Transactions Header
                 HStack {
                     Text("History")
@@ -37,7 +47,7 @@ struct AccountDetailView: View {
                         .foregroundColor(AppTheme.textPrimary)
                     Spacer()
                 }
-                
+
                 // Transaction List
                 AccountTransactionList(account: account)
             }
@@ -54,7 +64,7 @@ struct AccountDetailView: View {
                     } label: {
                         Label("Edit", systemImage: "pencil")
                     }
-                    
+
                     Button(role: .destructive) {
                         showingDeleteAlert = true
                     } label: {
@@ -84,14 +94,45 @@ struct AccountDetailView: View {
         .alert("Delete Account", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                deleteAccount()
+                Task {
+                    await viewModel.deleteAccount()
+                }
             }
         } message: {
             Text("Are you sure you want to delete this account? This action cannot be undone.")
         }
+        // MVVM: Error handling
+        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            if let error = viewModel.errorMessage {
+                Text(error)
+            }
+        }
+        // MVVM: Loading overlay
+        .overlay {
+            if viewModel.loadingState.isLoading {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                }
+            }
+        }
+        // MVVM: Auto-dismiss on success (after delete)
+        .onChange(of: viewModel.loadingState) { _, newState in
+            if newState == .loaded {
+                dismiss()
+            }
+        }
         .preferredColorScheme(.dark)
     }
-    
+
     private var accountHeaderCard: some View {
         VStack(spacing: 24) {
             // Icon
@@ -101,13 +142,13 @@ struct AccountDetailView: View {
                 size: 36
             )
             .shadow(color: accountColor.opacity(0.5), radius: 10)
-            
+
             // Balance
             VStack(spacing: 8) {
                 Text(account.name ?? "Unknown Account")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(AppTheme.textPrimary)
-                
+
                 Text(account.typeEnum.rawValue)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(AppTheme.textSecondary)
@@ -115,12 +156,12 @@ struct AccountDetailView: View {
                     .padding(.vertical, 4)
                     .background(AppTheme.secondaryBackground)
                     .cornerRadius(20)
-                
-                Text(formatCurrency(account.balance))
+
+                Text(viewModel.formatCurrency(account.balance))
                     .font(.system(size: 42, weight: .bold, design: .rounded))
                     .foregroundColor(balanceColor)
                     .padding(.top, 12)
-                
+
                 if account.isLiability {
                     Text("Liability Account")
                         .font(.system(size: 13, weight: .medium))
@@ -157,7 +198,7 @@ struct AccountDetailView: View {
         )
         .shadow(color: Color.black.opacity(0.4), radius: 20, x: 0, y: 10)
     }
-    
+
     private func creditCardView(last4: String) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 12) {
@@ -197,16 +238,16 @@ struct AccountDetailView: View {
                             }
                             .padding(.vertical, 8)
                         )
-                    
+
                     Spacer()
-                    
+
                     Image(systemName: "wave.3.right")
                         .font(.system(size: 20))
                         .foregroundColor(.white.opacity(0.6))
                 }
-                
+
                 Spacer()
-                
+
                 HStack(spacing: 4) {
                     Text("••••")
                     Text("••••")
@@ -215,7 +256,7 @@ struct AccountDetailView: View {
                         .font(.system(size: 20, weight: .bold, design: .monospaced))
                 }
                 .foregroundColor(.white.opacity(0.9))
-                
+
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("CARD HOLDER")
@@ -225,9 +266,9 @@ struct AccountDetailView: View {
                             .font(.caption)
                             .fontWeight(.bold)
                     }
-                    
+
                     Spacer()
-                    
+
                     if account.typeEnum == .creditCard {
                         // Assuming generic Visa/Mastercard style logo if specific asset not known
                         // Just text for now or simple circle
@@ -261,18 +302,18 @@ struct AccountDetailView: View {
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
     }
-    
+
     private var quickStatsCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Details")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundColor(AppTheme.textPrimary)
                 .padding(.leading, 4)
-            
+
             VStack(spacing: 0) {
                 StatRow(title: "Currency", value: account.currency ?? SettingsManager.shared.currencyCode, isLast: false)
                 StatRow(title: "Type", value: account.typeEnum.rawValue, isLast: false)
-                
+
                 if account.typeEnum == .creditCard || account.typeEnum == .bnpl {
                     if account.billingDay > 0 {
                         StatRow(title: "Billing Cycle", value: "Day \(account.billingDay)", isLast: false)
@@ -281,8 +322,8 @@ struct AccountDetailView: View {
                         StatRow(title: "Payment Due", value: "Day \(account.dueDay)", isLast: false)
                     }
                 }
-                
-                StatRow(title: "Created", value: formatDate(account.createdAt), isLast: true)
+
+                StatRow(title: "Created", value: viewModel.formatDate(account.createdAt), isLast: true)
             }
             .background(AppTheme.cardBackground)
             .cornerRadius(20)
@@ -292,40 +333,16 @@ struct AccountDetailView: View {
             )
         }
     }
-    
+
     private var accountColor: Color {
         return account.typeEnum.color
     }
-    
+
     private var balanceColor: Color {
         if account.isLiability {
             return AppTheme.expense
         }
         return account.balance >= 0 ? AppTheme.income : AppTheme.expense
-    }
-    
-    private func formatCurrency(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = account.currency ?? SettingsManager.shared.currencyCode
-        return formatter.string(from: NSNumber(value: value)) ?? "$0.00"
-    }
-    
-    private func formatDate(_ date: Date?) -> String {
-        guard let date = date else { return "Unknown" }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
-    }
-    
-    private func deleteAccount() {
-        viewContext.delete(account)
-        do {
-            try viewContext.save()
-            dismiss()
-        } catch {
-            print("Error deleting account: \(error)")
-        }
     }
 }
 
@@ -333,27 +350,38 @@ struct StatRow: View {
     let title: String
     let value: String
     let isLast: Bool
-    
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text(title)
                     .font(.system(size: 15))
                     .foregroundColor(AppTheme.textSecondary)
-                
+
                 Spacer()
-                
+
                 Text(value)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(AppTheme.textPrimary)
             }
             .padding(16)
-            
+
             if !isLast {
                 Divider()
                     .background(Color.white.opacity(0.05))
                     .padding(.leading, 16)
             }
         }
+    }
+}
+
+#Preview {
+    let context = PersistenceController.preview.container.viewContext
+    let fetchRequest: NSFetchRequest<Account> = Account.fetchRequest()
+    let account = (try? context.fetch(fetchRequest).first) ?? Account(context: context)
+
+    return NavigationStack {
+        AccountDetailView(account: account)
+            .environmentObject(DependencyContainer(persistenceController: .preview))
     }
 }

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import CoreData
 
 @MainActor
 class AccountDetailViewModel: ObservableObject, ViewModelProtocol {

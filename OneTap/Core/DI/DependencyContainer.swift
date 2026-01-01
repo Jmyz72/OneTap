@@ -25,7 +25,7 @@ class DependencyContainer: ObservableObject {
     let transferService: TransferService
     let validationService: ValidationService
 
-    init(persistenceController: PersistenceController = .shared) {
+    nonisolated init(persistenceController: PersistenceController = .shared) {
         self.persistenceController = persistenceController
 
         // Initialize repositories

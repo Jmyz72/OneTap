@@ -38,6 +38,7 @@ enum ValidationError: LocalizedError {
     case invalidAccountName
     case duplicateAccount
     case emptyName
+    case invalidCategoryName
 
     var errorDescription: String? {
         switch self {
@@ -55,6 +56,8 @@ enum ValidationError: LocalizedError {
             return "An account with this name already exists"
         case .emptyName:
             return "Name cannot be empty"
+        case .invalidCategoryName:
+            return "Category name cannot be empty"
         }
     }
 }
