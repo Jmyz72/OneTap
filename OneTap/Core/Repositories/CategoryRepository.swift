@@ -122,6 +122,14 @@ class CategoryRepository: BaseRepository {
         }
     }
 
+    // MARK: - Validation
+
+    func validateCategory(name: String) throws {
+        guard !name.isEmpty else {
+            throw ValidationError.invalidCategoryName
+        }
+    }
+
     // MARK: - Ordering
 
     func reorderCategories(_ categories: [Category]) throws {

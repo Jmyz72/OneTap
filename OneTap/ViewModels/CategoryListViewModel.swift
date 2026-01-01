@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import CoreData
 
 @MainActor
 class CategoryListViewModel: ObservableObject, ViewModelProtocol {

@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		00450DA32F06B1F1001AD500 /* Screenshot 2026-01-01 at 9.45.10 PM.png in Resources */ = {isa = PBXBuildFile; fileRef = 00450DA22F06B1F1001AD500 /* Screenshot 2026-01-01 at 9.45.10 PM.png */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		003155CB2F0223470060115D /* OneTap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OneTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		00450DA22F06B1F1001AD500 /* Screenshot 2026-01-01 at 9.45.10 PM.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Screenshot 2026-01-01 at 9.45.10 PM.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +37,7 @@
 		003155C22F0223470060115D = {
 			isa = PBXGroup;
 			children = (
+				00450DA22F06B1F1001AD500 /* Screenshot 2026-01-01 at 9.45.10 PM.png */,
 				003155CD2F0223470060115D /* OneTap */,
 				003155CC2F0223470060115D /* Products */,
 			);
@@ -109,6 +115,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				00450DA32F06B1F1001AD500 /* Screenshot 2026-01-01 at 9.45.10 PM.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
