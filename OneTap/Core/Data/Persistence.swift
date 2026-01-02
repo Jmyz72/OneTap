@@ -17,6 +17,7 @@ class PersistenceController {
         
         // Seed default categories
         Category.seedDefaults(context: viewContext)
+        try? viewContext.save()
         
         // Fetch categories for later use
         let categoryFetchRequest: NSFetchRequest<Category> = Category.fetchRequest()
@@ -150,9 +151,10 @@ class PersistenceController {
             let count = try context.count(for: request)
             if count == 0 {
                 Category.seedDefaults(context: context)
+                try context.save()
             }
         } catch {
-            print("Error checking categories: \(error)")
+            print("Error with categories: \(error)")
         }
     }
     
@@ -178,6 +180,7 @@ class PersistenceController {
             
             // Re-seed default categories
             Category.seedDefaults(context: self.container.viewContext)
+            try? self.container.viewContext.save()
         }
     }
 

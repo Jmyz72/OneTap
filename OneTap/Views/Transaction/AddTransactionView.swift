@@ -10,105 +10,109 @@ internal import CoreData
 
 struct AddTransactionView: View {
     @EnvironmentObject private var container: DependencyContainer
-    @Environment(\.dismiss) private var dismiss
-
     @State private var viewModel: AddTransactionViewModel?
+
+    var body: some View {
+        Group {
+            if let viewModel {
+                AddTransactionContent(viewModel: viewModel)
+            } else {
+                ProgressView()
+            }
+        }
+        .onAppear {
+            if viewModel == nil {
+                viewModel = container.makeAddTransactionViewModel()
+            }
+        }
+    }
+}
+
+// MARK: - Content View
+
+private struct AddTransactionContent: View {
+    @ObservedObject var viewModel: AddTransactionViewModel
+    @Environment(\.dismiss) private var dismiss
 
     // UI State for Sheets/Pickers (view-only state)
     @State private var showingDatePicker = false
     @State private var showingAccountPicker = false
     @State private var showingToAccountPicker = false
-    @State private var showingSubCategoryPicker = false
+    @State private var categoryForSubcategoryPicker: Category?
     @State private var showingNoteInput = false
     @State private var showingSplitSheet = false
 
+    @FocusState private var focusedField: TransactionDetailsInput.Field?
+
     var body: some View {
         NavigationStack {
-            Group {
-                if let viewModel {
+            ZStack {
+                AppTheme.background.ignoresSafeArea()
+                mainContent
+            }
+            .sheet(isPresented: $showingDatePicker) {
+                datePickerSheet
+            }
+            .sheet(isPresented: $showingAccountPicker) {
+                AccountPickerSheet(
+                    accounts: viewModel.accounts,
+                    selectedAccount: $viewModel.selectedAccount
+                )
+            }
+            .sheet(isPresented: $showingToAccountPicker) {
+                AccountPickerSheet(
+                    accounts: viewModel.accounts,
+                    selectedAccount: $viewModel.toAccount,
+                    excludeId: viewModel.selectedAccount?.id
+                )
+            }
+            .sheet(isPresented: $showingSplitSheet) {
+                splitSheetView
+            }
+            .sheet(item: $categoryForSubcategoryPicker) { category in
+                SubCategoryPickerSheet(
+                    category: category,
+                    selectedSubCategory: $viewModel.selectedSubCategory
+                )
+            }
+            .alert("Add Note", isPresented: $showingNoteInput) {
+                TextField("Note", text: $viewModel.note)
+                Button("Done") { }
+            }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                }
+            }
+            .overlay {
+                if viewModel.loadingState.isLoading {
                     ZStack {
-                        AppTheme.background.ignoresSafeArea()
-                        mainContent(viewModel: viewModel)
-                    }
-                    .sheet(isPresented: $showingDatePicker) {
-                        datePickerSheet
-                    }
-                    .sheet(isPresented: $showingAccountPicker) {
-                        AccountPickerSheet(accounts: viewModel.accounts, selectedAccount: Binding(
-                            get: { viewModel.selectedAccount },
-                            set: { viewModel.selectedAccount = $0 }
-                        ))
-                    }
-                    .sheet(isPresented: $showingToAccountPicker) {
-                        AccountPickerSheet(accounts: viewModel.accounts, selectedAccount: Binding(
-                            get: { viewModel.toAccount },
-                            set: { viewModel.toAccount = $0 }
-                        ), excludeId: viewModel.selectedAccount?.id)
-                    }
-                    .sheet(isPresented: $showingSplitSheet) {
-                        splitSheetView(viewModel: viewModel)
-                    }
-                    .confirmationDialog("Select Subcategory", isPresented: $showingSubCategoryPicker, titleVisibility: .visible) {
-                        subcategoryButtons(viewModel: viewModel)
-                    }
-                    .alert("Add Note", isPresented: $showingNoteInput) {
-                        TextField("Note", text: Binding(
-                            get: { viewModel.note },
-                            set: { viewModel.note = $0 }
-                        ))
-                        Button("Done") { }
-                    }
-                    // MVVM: Error handling
-                    .alert("Error", isPresented: Binding(
-                        get: { viewModel.errorMessage != nil },
-                        set: { if !$0 { viewModel.errorMessage = nil } }
-                    )) {
-                        Button("OK") {
-                            viewModel.errorMessage = nil
-                        }
-                    } message: {
-                        if let error = viewModel.errorMessage {
-                            Text(error)
-                        }
-                    }
-                    // MVVM: Loading overlay
-                    .overlay {
-                        if viewModel.loadingState.isLoading {
-                            ZStack {
-                                Color.black.opacity(0.4)
-                                    .ignoresSafeArea()
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
 
-                                ProgressView()
-                                    .scaleEffect(1.5)
-                                    .tint(.white)
-                            }
-                        }
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
                     }
-                    .onChange(of: viewModel.selectedType) { _, newValue in
-                        viewModel.typeChanged(to: newValue)
-                    }
-                    .onChange(of: viewModel.selectedCategory) { _, _ in
-                        viewModel.categoryChanged()
-                    }
-                    .onChange(of: viewModel.loadingState) { _, newState in
-                        if newState == .loaded {
-                            dismiss()
-                        }
-                    }
-                } else {
-                    ProgressView()
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
+            .onChange(of: viewModel.selectedType) { _, newValue in
+                viewModel.typeChanged(to: newValue)
             }
-            .onAppear {
-                // Initialize ViewModel from injected container
-                if viewModel == nil {
-                    viewModel = container.makeAddTransactionViewModel()
+            .onChange(of: viewModel.selectedCategory) { _, _ in
+                viewModel.categoryChanged()
+            }
+            .onChange(of: viewModel.loadingState) { _, newState in
+                if newState == .loaded {
+                    dismiss()
                 }
             }
         }
@@ -116,49 +120,47 @@ struct AddTransactionView: View {
 
     // MARK: - Subviews
 
-    @ViewBuilder
-    private func mainContent(viewModel: AddTransactionViewModel) -> some View {
+    private var mainContent: some View {
         VStack(spacing: 0) {
-            TransactionTypePicker(selectedType: Binding(
-                get: { viewModel.selectedType },
-                set: { viewModel.selectedType = $0 }
-            ))
+            if focusedField == nil {
+                TransactionTypePicker(selectedType: $viewModel.selectedType)
 
-            topSelectionView(viewModel: viewModel)
+                topSelectionView
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.selectedType)
 
-            Spacer()
+                Spacer()
+                
+                TransactionMiddleBar(
+                    selectedCategory: $viewModel.selectedCategory,
+                    selectedSubCategory: $viewModel.selectedSubCategory,
+                    selectedAccount: $viewModel.selectedAccount,
+                    transactionDate: $viewModel.transactionDate,
+                    splitItems: $viewModel.splitItems,
+                    note: $viewModel.note,
+                    selectedType: viewModel.selectedType,
+                    onSubCategoryTap: {
+                        if let category = viewModel.selectedCategory {
+                            categoryForSubcategoryPicker = category
+                        }
+                    },
+                    onAccountTap: { showingAccountPicker = true },
+                    onSplitTap: { showingSplitSheet = true },
+                    onNoteTap: { showingNoteInput = true }
+                )
+            } else {
+                Spacer()
+            }
 
-            TransactionMiddleBar(
-                selectedCategory: Binding(
-                    get: { viewModel.selectedCategory },
-                    set: { viewModel.selectedCategory = $0 }
-                ),
-                selectedSubCategory: Binding(
-                    get: { viewModel.selectedSubCategory },
-                    set: { viewModel.selectedSubCategory = $0 }
-                ),
-                selectedAccount: Binding(
-                    get: { viewModel.selectedAccount },
-                    set: { viewModel.selectedAccount = $0 }
-                ),
-                transactionDate: Binding(
-                    get: { viewModel.transactionDate },
-                    set: { viewModel.transactionDate = $0 }
-                ),
-                splitItems: Binding(
-                    get: { viewModel.splitItems },
-                    set: { viewModel.splitItems = $0 }
-                ),
-                note: Binding(
-                    get: { viewModel.note },
-                    set: { viewModel.note = $0 }
-                ),
-                selectedType: viewModel.selectedType,
-                onSubCategoryTap: { showingSubCategoryPicker = true },
-                onAccountTap: { showingAccountPicker = true },
+            TransactionDetailsInput(
+                title: $viewModel.title,
+                merchant: $viewModel.merchant,
+                transactionDate: $viewModel.transactionDate,
+                merchantSuggestions: viewModel.merchantSuggestions,
+                onMerchantChanged: {
+                    viewModel.updateMerchantSuggestions()
+                },
                 onDateTap: { showingDatePicker = true },
-                onSplitTap: { showingSplitSheet = true },
-                onNoteTap: { showingNoteInput = true }
+                focusedField: $focusedField
             )
 
             TransactionAmountDisplay(
@@ -168,12 +170,14 @@ struct AddTransactionView: View {
                 selectedType: viewModel.selectedType
             )
 
-            keypadSection(viewModel: viewModel)
+            if focusedField == nil {
+                keypadSection
+            }
         }
     }
 
     @ViewBuilder
-    private func topSelectionView(viewModel: AddTransactionViewModel) -> some View {
+    private var topSelectionView: some View {
         if viewModel.selectedType == .transfer {
             TransactionTransferSelector(
                 selectedAccount: viewModel.selectedAccount,
@@ -181,25 +185,30 @@ struct AddTransactionView: View {
                 onSelectFrom: { showingAccountPicker = true },
                 onSelectTo: { showingToAccountPicker = true }
             )
+            .id("transfer")
+            .transition(.opacity)
         } else {
             TransactionCategoryGrid(
                 categories: viewModel.categories,
                 selectedType: viewModel.selectedType,
-                selectedCategory: Binding(
-                    get: { viewModel.selectedCategory },
-                    set: { viewModel.selectedCategory = $0 }
-                )
+                selectedCategory: $viewModel.selectedCategory,
+                onCategoryTapped: { category in
+                    // Show subcategory sheet if category has subcategories
+                    if let subcategories = category.subCategories?.allObjects as? [SubCategory],
+                       !subcategories.isEmpty {
+                        categoryForSubcategoryPicker = category
+                    }
+                }
             )
+            .id("category-\(viewModel.selectedType.rawValue)")
+            .transition(.opacity)
         }
     }
 
-    private func keypadSection(viewModel: AddTransactionViewModel) -> some View {
+    private var keypadSection: some View {
         VStack {
             CustomKeypad(
-                value: Binding(
-                    get: { viewModel.amountString },
-                    set: { viewModel.amountString = $0 }
-                ),
+                value: $viewModel.amountString,
                 onDone: {
                     Task {
                         await viewModel.saveTransaction()
@@ -213,27 +222,9 @@ struct AddTransactionView: View {
         .padding(.bottom, 10)
     }
 
-    @ViewBuilder
-    private func subcategoryButtons(viewModel: AddTransactionViewModel) -> some View {
-        if let category = viewModel.selectedCategory,
-           let subs = category.subCategories?.allObjects as? [SubCategory] {
-            ForEach(subs.sorted { $0.order < $1.order }) { sub in
-                Button(sub.name ?? "Unnamed") {
-                    viewModel.selectedSubCategory = sub
-                }
-            }
-            Button("None") {
-                viewModel.selectedSubCategory = nil
-            }
-        }
-    }
-
     private var datePickerSheet: some View {
         VStack {
-            DatePicker("Date", selection: Binding(
-                get: { viewModel?.transactionDate ?? Date() },
-                set: { viewModel?.transactionDate = $0 }
-            ), displayedComponents: [.date, .hourAndMinute])
+            DatePicker("Date", selection: $viewModel.transactionDate, displayedComponents: [.date, .hourAndMinute])
                 .datePickerStyle(.graphical)
                 .padding()
             Button("Done") { showingDatePicker = false }
@@ -244,13 +235,11 @@ struct AddTransactionView: View {
     }
 
     @ViewBuilder
-    private func splitSheetView(viewModel: AddTransactionViewModel) -> some View {
+    private var splitSheetView: some View {
         SplitTransactionSheet(
-            items: Binding(
-                get: { viewModel.splitItems },
-                set: { viewModel.splitItems = $0 }
-            ),
-            currencyCode: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+            items: $viewModel.splitItems,
+            currencyCode: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode,
+            categories: viewModel.categories
         )
     }
 }

@@ -26,6 +26,11 @@ class CategoryListViewModel: ObservableObject, ViewModelProtocol {
     init(categoryRepository: CategoryRepository) {
         self.categoryRepository = categoryRepository
         setupSubscriptions()
+
+        // Also do an initial fetch to populate immediately
+        let allCategories = categoryRepository.fetchCategories(type: nil)
+        self.expenseCategories = allCategories.filter { $0.typeEnum == .expense }.sorted { $0.order < $1.order }
+        self.incomeCategories = allCategories.filter { $0.typeEnum == .income }.sorted { $0.order < $1.order }
     }
 
     // MARK: - Subscriptions

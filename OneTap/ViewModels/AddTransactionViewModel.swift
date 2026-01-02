@@ -21,12 +21,15 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var selectedAccount: Account?
     @Published var toAccount: Account?
     @Published var transactionDate = Date()
+    @Published var title = ""
+    @Published var merchant = ""
     @Published var note = ""
     @Published var splitItems: [SplitItemData] = []
 
     // Data from repositories
     @Published var categories: [Category] = []
     @Published var accounts: [Account] = []
+    @Published var merchantSuggestions: [String] = []
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -109,10 +112,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                 receiveValue: { [weak self] categories in
                     guard let self = self else { return }
                     self.categories = categories
-                    // Set default category if none selected
-                    if self.selectedCategory == nil {
-                        self.selectedCategory = categories.first { $0.typeEnum == self.selectedType }
-                    }
+                    // Don't auto-select category - let user choose
                 }
             )
             .store(in: &cancellables)
@@ -125,17 +125,17 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         accounts = accountRepository.fetchAccounts(group: nil)
         categories = categoryRepository.fetchCategories(type: nil)
 
+        // Auto-select first account (helpful default)
         if selectedAccount == nil {
             selectedAccount = accounts.first
         }
-        if selectedCategory == nil {
-            selectedCategory = categories.first { $0.typeEnum == selectedType }
-        }
+        // Don't auto-select category - let user choose
     }
 
     func typeChanged(to newType: TransactionType) {
         if newType != .transfer {
-            selectedCategory = categories.first { $0.typeEnum == newType }
+            // Clear selections when switching types - let user choose
+            selectedCategory = nil
             selectedSubCategory = nil
             splitItems = []
         }
@@ -143,6 +143,10 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
 
     func categoryChanged() {
         selectedSubCategory = nil
+    }
+
+    func updateMerchantSuggestions() {
+        merchantSuggestions = transactionRepository.fetchUniqueMerchants(matching: merchant)
     }
 
     func addSplitItem() {
@@ -205,18 +209,19 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                 )
             } else {
                 // Regular transaction or split transaction
-                let title = splitItems.isEmpty
-                    ? (note.isEmpty ? (selectedCategory?.name ?? "Transaction") : note)
+                let transactionTitle = splitItems.isEmpty
+                    ? (title.isEmpty ? (selectedCategory?.name ?? "Transaction") : title)
                     : "Split Transaction (\(splitItems.count) Items)"
 
                 let transaction = try transactionRepository.createTransaction(
-                    title: title,
+                    title: transactionTitle,
                     amount: totalAmount,
                     type: selectedType,
                     date: transactionDate,
                     account: account,
                     category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
                     subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
+                    merchant: merchant.isEmpty ? nil : merchant,
                     notes: note.isEmpty ? nil : note
                 )
 

@@ -153,4 +153,26 @@ class CategoryFormViewModel: ObservableObject, ViewModelProtocol {
             handleError(error)
         }
     }
+
+    func moveSubCategory(from source: IndexSet, to destination: Int) async {
+        // Reorder the local array
+        subCategories.move(fromOffsets: source, toOffset: destination)
+
+        // Update the order property for each subcategory
+        for (index, sub) in subCategories.enumerated() {
+            sub.order = Int16(index)
+        }
+
+        // Save changes
+        do {
+            try categoryRepository.save()
+        } catch {
+            handleError(error)
+
+            // Reload on error to revert
+            if let category = category, let subs = category.subCategories?.allObjects as? [SubCategory] {
+                subCategories = subs.sorted { $0.order < $1.order }
+            }
+        }
+    }
 }

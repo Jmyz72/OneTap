@@ -93,6 +93,13 @@ final class DependencyContainer: ObservableObject {
         )
     }
 
+    func makeAccountTransactionListViewModel(account: Account) -> AccountTransactionListViewModel {
+        AccountTransactionListViewModel(
+            account: account,
+            transactionRepository: transactionRepository
+        )
+    }
+
     func makeTransactionListViewModel() -> TransactionListViewModel {
         TransactionListViewModel(transactionRepository: transactionRepository)
     }

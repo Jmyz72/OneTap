@@ -26,7 +26,7 @@ class CategoryRepository: BaseRepository {
         let subject = CurrentValueSubject<[Category], Error>(initialCategories)
 
         // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 let categories = self.fetchCategories(type: type)
@@ -168,12 +168,13 @@ class CategoryRepository: BaseRepository {
         // 1. Fetch all existing (old) categories
         let oldCategoriesRequest: NSFetchRequest<Category> = Category.fetchRequest()
         let oldCategories = try context.fetch(oldCategoriesRequest)
-        
+
         // 2. Seed new default categories
         // We use the model's logic but we need to capture the new objects to use them
         // So we will manually duplicate the seed logic here to get the references,
         // or fetch them immediately after seeding.
         Category.seedDefaults(context: context)
+        try context.save()
         
         // 3. Fetch the NEW categories we just created
         // We can identify them because they are not in the 'oldCategories' list
@@ -218,7 +219,7 @@ class CategoryRepository: BaseRepository {
         for category in oldCategories {
             context.delete(category)
         }
-        
+
         try save()
     }
 }

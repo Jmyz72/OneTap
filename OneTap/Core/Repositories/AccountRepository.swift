@@ -26,7 +26,7 @@ class AccountRepository: BaseRepository {
         let subject = CurrentValueSubject<[Account], Error>(initialAccounts)
 
         // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 let accounts = self.fetchAccounts(group: nil)
@@ -42,7 +42,7 @@ class AccountRepository: BaseRepository {
         let subject = CurrentValueSubject<Account?, Error>(initialAccount)
 
         // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 let account = self.findByID(id)
