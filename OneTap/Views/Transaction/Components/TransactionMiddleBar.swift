@@ -11,6 +11,7 @@ struct TransactionMiddleBar: View {
     @Binding var selectedSubCategory: SubCategory?
     @Binding var selectedAccount: Account?
     @Binding var transactionDate: Date
+    @Binding var merchant: String
     @Binding var splitItems: [SplitItemData]
     @Binding var note: String
     let selectedType: TransactionType
@@ -18,6 +19,7 @@ struct TransactionMiddleBar: View {
     // Actions
     let onSubCategoryTap: () -> Void
     let onAccountTap: () -> Void
+    let onMerchantTap: () -> Void
     let onSplitTap: () -> Void
     let onNoteTap: () -> Void
     
@@ -30,6 +32,15 @@ struct TransactionMiddleBar: View {
                         icon: "creditcard.fill",
                         text: selectedAccount?.name ?? "Select Account",
                         isActive: selectedAccount != nil
+                    )
+                }
+
+                // Merchant Chip
+                Button(action: onMerchantTap) {
+                    chipView(
+                        icon: "mappin.and.ellipse",
+                        text: merchant.isEmpty ? "Add Merchant" : merchant,
+                        isActive: !merchant.isEmpty
                     )
                 }
 
