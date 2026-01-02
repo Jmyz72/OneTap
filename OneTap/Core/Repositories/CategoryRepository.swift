@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CoreData
+internal import CoreData
 import Combine
 
 class CategoryRepository: BaseRepository {
@@ -22,7 +22,8 @@ class CategoryRepository: BaseRepository {
     // MARK: - Publishers
 
     func categoriesPublisher(type: TransactionType?) -> AnyPublisher<[Category], Error> {
-        let subject = PassthroughSubject<[Category], Error>()
+        let initialCategories = fetchCategories(type: type)
+        let subject = CurrentValueSubject<[Category], Error>(initialCategories)
 
         // Observe Core Data changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
@@ -32,10 +33,6 @@ class CategoryRepository: BaseRepository {
                 subject.send(categories)
             }
             .store(in: &cancellables)
-
-        // Send initial value
-        let categories = fetchCategories(type: type)
-        subject.send(categories)
 
         return subject.eraseToAnyPublisher()
     }
@@ -153,6 +150,75 @@ class CategoryRepository: BaseRepository {
 
         // Use the existing seeding logic from CategoryModel
         Category.seedDefaults(context: context)
+        try save()
+    }
+
+    func deleteAllCategories() throws {
+        let fetchRequest: NSFetchRequest<Category> = Category.fetchRequest()
+        let categories = try context.fetch(fetchRequest)
+        
+        for category in categories {
+            context.delete(category)
+        }
+        
+        try save()
+    }
+
+    func resetToDefaults() throws {
+        // 1. Fetch all existing (old) categories
+        let oldCategoriesRequest: NSFetchRequest<Category> = Category.fetchRequest()
+        let oldCategories = try context.fetch(oldCategoriesRequest)
+        
+        // 2. Seed new default categories
+        // We use the model's logic but we need to capture the new objects to use them
+        // So we will manually duplicate the seed logic here to get the references,
+        // or fetch them immediately after seeding.
+        Category.seedDefaults(context: context)
+        
+        // 3. Fetch the NEW categories we just created
+        // We can identify them because they are not in the 'oldCategories' list
+        // (Actually, checking ID is safer, but newly inserted objects have temporary IDs until save.
+        // A safer way is to fetch all and filter out the old ones).
+        
+        // Let's just fetch all categories.
+        let allCategories = fetchCategories(type: nil) // fetch logic is sorting by order
+        let newCategories = allCategories.filter { newCat in
+            !oldCategories.contains(where: { $0.objectID == newCat.objectID })
+        }
+        
+        // 4. Fetch all Transactions
+        let transactionRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+        let transactions = try context.fetch(transactionRequest)
+        
+        // 5. Reassign Transactions
+        for transaction in transactions {
+            guard let oldCat = transaction.category else { continue }
+            
+            // Try to find a new category with the same name and type
+            if let match = newCategories.first(where: { 
+                $0.name == oldCat.name && $0.type == oldCat.type 
+            }) {
+                transaction.category = match
+            } else {
+                // Fallback to "Others" of the same type
+                if let others = newCategories.first(where: { 
+                    ($0.name == "Others" || $0.name == "Other") && $0.type == oldCat.type 
+                }) {
+                    transaction.category = others
+                } else {
+                    // Last resort: just pick the first one of same type
+                    if let anyMatch = newCategories.first(where: { $0.type == oldCat.type }) {
+                        transaction.category = anyMatch
+                    }
+                }
+            }
+        }
+        
+        // 6. Delete OLD categories
+        for category in oldCategories {
+            context.delete(category)
+        }
+        
         try save()
     }
 }

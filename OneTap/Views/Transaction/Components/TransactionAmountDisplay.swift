@@ -4,11 +4,12 @@
 //
 
 import SwiftUI
+internal import CoreData
 
 struct TransactionAmountDisplay: View {
     let amountString: String
     let selectedAccount: Account?
-    let splitItems: [SplitItemTemp]
+    let splitItems: [SplitItemData]
     let selectedType: TransactionType
     
     var body: some View {

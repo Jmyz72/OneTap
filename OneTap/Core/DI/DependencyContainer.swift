@@ -8,7 +8,7 @@
 
 import Foundation
 import SwiftUI
-import CoreData
+internal import CoreData
 import Combine
 
 @MainActor
@@ -52,6 +52,8 @@ final class DependencyContainer: ObservableObject {
     func makeAddTransactionViewModel() -> AddTransactionViewModel {
         AddTransactionViewModel(
             transactionRepository: transactionRepository,
+            accountRepository: accountRepository,
+            categoryRepository: categoryRepository,
             transferService: transferService,
             balanceService: balanceService,
             validationService: validationService
@@ -62,6 +64,8 @@ final class DependencyContainer: ObservableObject {
         EditTransactionViewModel(
             transaction: transaction,
             transactionRepository: transactionRepository,
+            accountRepository: accountRepository,
+            categoryRepository: categoryRepository,
             transferService: transferService,
             balanceService: balanceService
         )
@@ -110,5 +114,9 @@ final class DependencyContainer: ObservableObject {
             category: category,
             categoryRepository: categoryRepository
         )
+    }
+    
+    func makeSettingsViewModel() -> SettingsViewModel {
+        SettingsViewModel(persistenceController: persistenceController)
     }
 }

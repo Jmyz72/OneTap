@@ -4,13 +4,14 @@
 //
 
 import SwiftUI
+internal import CoreData
 
 struct TransactionMiddleBar: View {
     @Binding var selectedCategory: Category?
     @Binding var selectedSubCategory: SubCategory?
     @Binding var selectedAccount: Account?
     @Binding var transactionDate: Date
-    @Binding var splitItems: [SplitItemTemp]
+    @Binding var splitItems: [SplitItemData]
     @Binding var note: String
     let selectedType: TransactionType
     
@@ -62,7 +63,6 @@ struct TransactionMiddleBar: View {
                             isActive: !splitItems.isEmpty
                         )
                     }
-                    .disabled(splitItems.isEmpty)
                 }
                 
                 // Note Chip

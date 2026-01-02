@@ -6,93 +6,117 @@
 //
 
 import SwiftUI
-import CoreData
+internal import CoreData
 
 struct AccountListView: View {
     @EnvironmentObject private var container: DependencyContainer
     @ObservedObject var settings = SettingsManager.shared
 
-    @StateObject private var viewModel: AccountListViewModel
+    @State private var viewModel: AccountListViewModel?
 
     // UI State (view-only state)
     @State private var showingAddAccount = false
     @State private var accountToEdit: Account?
 
-    init() {
-        // Create temporary container and ViewModel
-        let tempContainer = DependencyContainer()
-        _viewModel = StateObject(wrappedValue: tempContainer.makeAccountListViewModel())
-    }
-
     var body: some View {
-        List {
-            // Net Worth Card (Header)
-            Section {
-                netWorthCard
-                    .listRowInsets(EdgeInsets()) // Remove default padding
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .padding(.bottom, 10)
-            }
+        Group {
+            if let viewModel {
+                List {
+                    // Net Worth Card (Header)
+                    Section {
+                        netWorthCard(viewModel: viewModel)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .padding(.bottom, 10)
+                    }
 
-            // Accounts Sections
-            if viewModel.accounts.isEmpty {
-                Section {
-                    emptyStateView
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-            } else {
-                ForEach(AccountGroup.allCases) { group in
-                    let groupAccounts = viewModel.groupedAccounts[group] ?? []
-
-                    if !groupAccounts.isEmpty {
-                        Section(header:
-                            Text(group.rawValue)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppTheme.textSecondary)
-                                .textCase(.uppercase)
-                                .padding(.leading, 4)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 0))
-                        ) {
-                            ForEach(groupAccounts) { account in
-                                ZStack {
-                                    NavigationLink(destination: AccountDetailView(account: account)) {
-                                        EmptyView()
-                                    }
-                                    .opacity(0)
-
-                                    AccountRow(account: account)
-                                        .drawingGroup()
-                                }
+                    // Accounts Sections
+                    if viewModel.accounts.isEmpty {
+                        Section {
+                            emptyStateView
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 12, trailing: 20))
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        Task {
-                                            await viewModel.deleteAccount(account)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                        }
+                    } else {
+                        ForEach(AccountGroup.allCases) { group in
+                            let groupAccounts = viewModel.groupedAccounts[group] ?? []
 
-                                    Button {
-                                        accountToEdit = account
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
+                            if !groupAccounts.isEmpty {
+                                Section(header:
+                                    Text(group.rawValue)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                        .textCase(.uppercase)
+                                        .padding(.leading, 4)
+                                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 0))
+                                ) {
+                                    ForEach(groupAccounts) { account in
+                                        ZStack {
+                                            NavigationLink(destination: AccountDetailView(account: account)) {
+                                                EmptyView()
+                                            }
+                                            .opacity(0)
+
+                                            AccountRow(account: account)
+                                                .drawingGroup()
+                                        }
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 12, trailing: 20))
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                            Button(role: .destructive) {
+                                                Task {
+                                                    await viewModel.deleteAccount(account)
+                                                }
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+
+                                            Button {
+                                                accountToEdit = account
+                                            } label: {
+                                                Label("Edit", systemImage: "pencil")
+                                            }
+                                            .tint(.blue)
+                                        }
                                     }
-                                    .tint(.blue)
                                 }
                             }
                         }
                     }
                 }
+                .listStyle(.plain)
+                .background(AppTheme.background.ignoresSafeArea())
+                .scrollContentBackground(.hidden)
+                .alert("Error", isPresented: Binding(
+                    get: { viewModel.errorMessage != nil },
+                    set: { if !$0 { viewModel.errorMessage = nil } }
+                )) {
+                    Button("OK") {
+                        viewModel.errorMessage = nil
+                    }
+                } message: {
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                    }
+                }
+                .overlay {
+                    if viewModel.loadingState.isLoading {
+                        ZStack {
+                            Color.black.opacity(0.4)
+                                .ignoresSafeArea()
+
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+                        }
+                    }
+                }
+            } else {
+                ProgressView()
             }
         }
-        .listStyle(.plain)
-        .background(AppTheme.background.ignoresSafeArea())
-        .scrollContentBackground(.hidden) // Important for dark mode list background
         .navigationTitle("Accounts")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -123,33 +147,16 @@ struct AccountListView: View {
                     }
             }
         }
-        // MVVM: Error handling
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let error = viewModel.errorMessage {
-                Text(error)
-            }
-        }
-        // MVVM: Loading overlay
-        .overlay {
-            if viewModel.loadingState.isLoading {
-                ZStack {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-                }
-            }
-        }
         .preferredColorScheme(.dark)
+        .onAppear {
+            // Initialize ViewModel from injected container
+            if viewModel == nil {
+                viewModel = container.makeAccountListViewModel()
+            }
+        }
     }
 
-    private var netWorthCard: some View {
+    private func netWorthCard(viewModel: AccountListViewModel) -> some View {
         VStack(spacing: 16) {
             // Net Worth
             VStack(spacing: 8) {
@@ -206,7 +213,7 @@ struct AccountListView: View {
         )
         .shadow(color: Color.black.opacity(0.3), radius: 10, x: 0, y: 5)
         .padding(.horizontal, 20)
-        .padding(.top, 20) // Add top padding inside the view since list removes it
+        .padding(.top, 20)
     }
 
     private var emptyStateView: some View {

@@ -9,24 +9,26 @@ OneTap is a native iOS personal finance application built with **SwiftUI** and *
 *   **State Management:** `@State` (local), `@Environment` (global), `@FetchRequest` (data)
 
 ## 2. Architecture
-The project follows a clean, modular architecture, described as "MVVM-Light".
+The project follows a robust **MVVM + Repository** architecture.
 
-*   **Views:** Passive UI components in `Views/`. No explicit separate ViewModel classes are used; Views interact directly with Core Data via `@FetchRequest`.
+*   **Views:** Passive UI components in `Views/`. They observe `ViewModels` and delegate logic.
+*   **ViewModels:** `ObservableObject` classes in `ViewModels/` that manage UI state and interact with Repositories.
 *   **Models:** Core Data entities (`OneTap.xcdatamodeld`) + Swift extensions/enums in `Models/`.
-*   **Data Layer:** Managed by `PersistenceController` in `Core/Data/Persistence.swift`.
-*   **Data Flow:** User Action → SwiftUI State → Core Data Context → Persistence Controller → SQLite.
+*   **Data Layer:** `Repositories/` abstract Core Data. `Services/` handle complex logic.
+*   **Data Flow:** User Action → ViewModel → Repository/Service → Core Data Context.
 
 ## 3. Directory Structure
-*   `OneTapApp.swift`: Entry point, sets up Core Data stack.
-*   `Models/`: Domain models (e.g., `TransactionModel.swift` for categories).
+*   `OneTapApp.swift`: Entry point, injects `DependencyContainer`.
+*   `Models/`: Domain models (`TransactionModel`, `AccountModel`).
+*   `ViewModels/`: Presentation logic (`TransactionListViewModel`, `AccountFormViewModel`).
 *   `Views/`:
-    *   `MainTabView.swift`: Root navigation (Transactions, Overview, Assets, More).
-    *   `ContentView.swift`: Transaction list (main feature).
-    *   `Transaction/`: Feature-specific views (`AddTransactionView`, `TransactionListView`).
-    *   `Shared/`: Reusable components (`TransactionRow`).
+    *   `MainTabView.swift`: Root navigation.
+    *   `Transaction/`: Feature views (`TransactionListView`, `AddTransactionView`).
+    *   `Account/`: Account management (`AccountListView`, `AccountFormView`).
 *   `Core/`:
-    *   `Data/Persistence.swift`: Core Data stack and preview data generation.
-    *   `Extensions/`: Helpers (e.g., `FormattersExtension.swift`).
+    *   `DI/`: Dependency Injection (`DependencyContainer`).
+    *   `Repositories/`: Data access (`TransactionRepository`, `AccountRepository`).
+    *   `Services/`: Business logic (`BalanceService`, `TransferService`).
 
 ## 4. Development Guide
 
@@ -38,17 +40,18 @@ The project follows a clean, modular architecture, described as "MVVM-Light".
 ### Common Tasks
 *   **Adding a Transaction:**
     ```swift
-    let newTransaction = Transaction(context: viewContext)
-    newTransaction.id = UUID()
-    // ... set properties
-    try? viewContext.save()
+    // In ViewModel
+    func saveTransaction() {
+        let transaction = Transaction(context: context)
+        // ... set properties
+        repository.add(transaction)
+    }
     ```
 *   **Fetching Data:**
     ```swift
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)],
-        animation: .default
-    ) private var transactions: FetchedResults<Transaction>
+    // In ViewModel
+    repository.transactionsPublisher
+        .assign(to: &$transactions)
     ```
 
 ### Conventions
@@ -57,10 +60,9 @@ The project follows a clean, modular architecture, described as "MVVM-Light".
 *   **Colors:** Use `TransactionCategory` enum for consistent category colors.
 
 ## 5. Roadmap
-The project is currently in **Phase 1 (Foundation)**.
-*   **Current:** Basic transaction tracking, categories, Core Data persistence.
+The project has completed **Phase 1 (Foundation)** and **Phase 2 (Accounts)**.
+*   **Current:** Refactoring to MVVM+Repository, implementing Budgeting.
 *   **Upcoming:**
-    *   Phase 2: Enhanced Transactions (Details, Filters).
     *   Phase 3: Budget Tracking.
     *   Phase 4: Asset Management (Stocks, Crypto).
     *   Phase 5: Analytics/Overview.

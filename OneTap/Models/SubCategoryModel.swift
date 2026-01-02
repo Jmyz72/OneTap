@@ -7,7 +7,7 @@
 
 import Foundation
 import SwiftUI
-import CoreData
+internal import CoreData
 
 extension SubCategory {
     var displayIcon: String {

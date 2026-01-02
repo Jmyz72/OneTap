@@ -5,7 +5,7 @@
 
 import Foundation
 import SwiftUI
-import CoreData
+internal import CoreData
 
 enum TransactionType: String, CaseIterable, Identifiable {
     case expense = "Expense"

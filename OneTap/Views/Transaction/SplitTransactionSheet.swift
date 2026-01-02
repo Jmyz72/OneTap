@@ -6,16 +6,10 @@
 //
 
 import SwiftUI
-
-struct SplitItemTemp: Identifiable, Equatable {
-    let id = UUID()
-    var title: String
-    var amount: Double
-    var category: Category?
-}
+internal import CoreData
 
 struct SplitTransactionSheet: View {
-    @Binding var items: [SplitItemTemp]
+    @Binding var items: [SplitItemData]
     var currencyCode: String
     
     @Environment(\.dismiss) private var dismiss

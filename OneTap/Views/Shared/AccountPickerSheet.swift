@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct AccountPickerSheet: View {
-    let accounts: FetchedResults<Account>
+    let accounts: [Account]
     @Binding var selectedAccount: Account?
     var excludeId: UUID? = nil
     @Environment(\.dismiss) var dismiss
