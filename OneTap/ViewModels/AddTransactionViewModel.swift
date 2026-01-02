@@ -209,9 +209,12 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                 )
             } else {
                 // Regular transaction or split transaction
-                let transactionTitle = splitItems.isEmpty
-                    ? (title.isEmpty ? (selectedCategory?.name ?? "Transaction") : title)
-                    : "Split Transaction (\(splitItems.count) Items)"
+                let transactionTitle: String
+                if !splitItems.isEmpty {
+                    transactionTitle = "Split Transaction (\(splitItems.count) Items)"
+                } else {
+                    transactionTitle = title
+                }
 
                 let transaction = try transactionRepository.createTransaction(
                     title: transactionTitle,

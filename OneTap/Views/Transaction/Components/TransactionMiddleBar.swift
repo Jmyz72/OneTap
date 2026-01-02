@@ -35,13 +35,15 @@ struct TransactionMiddleBar: View {
                     )
                 }
 
-                // Merchant Chip
-                Button(action: onMerchantTap) {
-                    chipView(
-                        icon: "mappin.and.ellipse",
-                        text: merchant.isEmpty ? "Add Merchant" : merchant,
-                        isActive: !merchant.isEmpty
-                    )
+                // Merchant Chip (Expense only)
+                if selectedType == .expense {
+                    Button(action: onMerchantTap) {
+                        chipView(
+                            icon: "mappin.and.ellipse",
+                            text: merchant.isEmpty ? "Add Merchant" : merchant,
+                            isActive: !merchant.isEmpty
+                        )
+                    }
                 }
 
                 // Split Chip (Expense only)

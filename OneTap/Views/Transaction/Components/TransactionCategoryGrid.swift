@@ -64,7 +64,7 @@ private struct CategoryGridItem: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 44, height: 44)
+                    .frame(width: 50, height: 50)
                     .overlay(
                         Circle()
                             .stroke(
@@ -82,7 +82,7 @@ private struct CategoryGridItem: View {
                     )
 
                 Image(systemName: category.iconName)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(
                         isSelected ?
                         LinearGradient(
