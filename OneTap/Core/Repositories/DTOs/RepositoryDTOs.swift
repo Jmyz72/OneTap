@@ -18,6 +18,7 @@ struct TransactionUpdateData {
     let account: Account?
     let category: Category?
     let subCategory: SubCategory?
+    let merchant: String?
     let notes: String?
 }
 

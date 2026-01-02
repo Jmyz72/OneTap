@@ -32,7 +32,7 @@ class TransactionRepository: BaseRepository {
         let subject = CurrentValueSubject<[Transaction], Error>(initialTransactions)
 
         // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 if let account = (try? self.context.existingObject(with: accountID)) as? Account {
@@ -62,7 +62,7 @@ class TransactionRepository: BaseRepository {
         let subject = CurrentValueSubject<[String: [Transaction]], Error>(grouped)
 
         // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 let transactions = self.fetch(predicate: predicate, sortDescriptors: [
@@ -89,6 +89,7 @@ class TransactionRepository: BaseRepository {
         account: Account,
         category: Category?,
         subCategory: SubCategory?,
+        merchant: String? = nil,
         notes: String?
     ) throws -> Transaction {
         let transaction = Transaction(context: context)
@@ -100,6 +101,7 @@ class TransactionRepository: BaseRepository {
         transaction.account = account
         transaction.category = category
         transaction.subCategory = subCategory
+        transaction.merchant = merchant
         transaction.notes = notes
         transaction.createdAt = Date()
         transaction.updatedAt = Date()
@@ -129,6 +131,9 @@ class TransactionRepository: BaseRepository {
         }
         if let subCategory = data.subCategory {
             transaction.subCategory = subCategory
+        }
+        if let merchant = data.merchant {
+            transaction.merchant = merchant
         }
         if let notes = data.notes {
             transaction.notes = notes
@@ -214,6 +219,37 @@ class TransactionRepository: BaseRepository {
             for item in items {
                 context.delete(item)
             }
+        }
+    }
+
+    // MARK: - Merchant Autocomplete
+
+    func fetchUniqueMerchants(matching searchText: String = "") -> [String] {
+        let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+        request.predicate = NSPredicate(format: "merchant != nil AND merchant != ''")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
+
+        do {
+            let transactions = try context.fetch(request)
+            var uniqueMerchants = Set<String>()
+
+            for transaction in transactions {
+                if let merchant = transaction.merchant, !merchant.isEmpty {
+                    uniqueMerchants.insert(merchant)
+                }
+            }
+
+            var merchants = Array(uniqueMerchants).sorted()
+
+            // Filter by search text if provided
+            if !searchText.isEmpty {
+                merchants = merchants.filter { $0.lowercased().contains(searchText.lowercased()) }
+            }
+
+            return Array(merchants.prefix(10)) // Limit to 10 suggestions
+        } catch {
+            print("Error fetching merchants: \(error)")
+            return []
         }
     }
 }

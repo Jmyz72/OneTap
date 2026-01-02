@@ -10,10 +10,31 @@ internal import CoreData
 
 struct TransactionListView: View {
     @EnvironmentObject private var container: DependencyContainer
-
     @State private var viewModel: TransactionListViewModel?
 
-    // UI State (view-only state)
+    var body: some View {
+        NavigationStack {
+            if let viewModel {
+                TransactionListContent(viewModel: viewModel)
+            } else {
+                ProgressView()
+                    .onAppear {
+                        if viewModel == nil {
+                            viewModel = container.makeTransactionListViewModel()
+                        }
+                    }
+            }
+        }
+        .onAppear {
+            if viewModel == nil {
+                viewModel = container.makeTransactionListViewModel()
+            }
+        }
+    }
+}
+
+private struct TransactionListContent: View {
+    @ObservedObject var viewModel: TransactionListViewModel
     @State private var showingAddTransaction = false
 
     // Keep @FetchRequest only for category picker UI
@@ -23,110 +44,120 @@ struct TransactionListView: View {
     ) private var categories: FetchedResults<Category>
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let viewModel {
-                    ZStack {
-                        AppTheme.background.ignoresSafeArea()
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
 
-                        VStack(spacing: 0) {
-                            // Filter Status Bar
-                            if viewModel.selectedCategoryFilter != nil || viewModel.selectedDateFilter != .all {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack {
-                                        if viewModel.selectedDateFilter != .all {
-                                            FilterChip(text: viewModel.selectedDateFilter.rawValue, icon: "calendar") {
-                                                viewModel.selectedDateFilter = .all
-                                            }
-                                        }
-                                        if let category = viewModel.selectedCategoryFilter {
-                                            FilterChip(text: category.name ?? "Category", icon: category.iconName) {
-                                                viewModel.selectedCategoryFilter = nil
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 8)
+            VStack(spacing: 0) {
+                // Filter Status Bar
+                if viewModel.selectedCategoryFilter != nil || viewModel.selectedSubCategoryFilter != nil || viewModel.selectedDateFilter != .all {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            if viewModel.selectedDateFilter != .all {
+                                FilterChip(text: viewModel.selectedDateFilter.rawValue, icon: "calendar") {
+                                    viewModel.selectedDateFilter = .all
                                 }
-                                .background(AppTheme.secondaryBackground)
                             }
-
-                            FilteredTransactionList(
-                                viewModel: viewModel,
-                                onAddTap: { showingAddTransaction = true }
-                            )
-                        }
-                    }
-                    .navigationTitle("Transactions")
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            HStack {
-                                Menu {
-                                    Picker("Date Range", selection: Binding(
-                                        get: { viewModel.selectedDateFilter },
-                                        set: { viewModel.selectedDateFilter = $0 }
-                                    )) {
-                                        ForEach(DateFilter.allCases) { filter in
-                                            Text(filter.rawValue).tag(filter)
-                                        }
-                                    }
-
-                                    Divider()
-
-                                    if !categories.isEmpty {
-                                        Menu("Category") {
-                                            Button("All Categories") {
-                                                viewModel.selectedCategoryFilter = nil
-                                            }
-                                            ForEach(categories) { category in
-                                                Button(category.name ?? "Unknown") {
-                                                    viewModel.selectedCategoryFilter = category
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    Image(systemName: "line.3.horizontal.decrease.circle")
-                                        .font(.system(size: 20))
-                                        .foregroundColor((viewModel.selectedDateFilter != .all || viewModel.selectedCategoryFilter != nil) ? AppTheme.accent : AppTheme.textPrimary)
+                            if let category = viewModel.selectedCategoryFilter {
+                                FilterChip(text: category.name ?? "Category", icon: category.iconName) {
+                                    viewModel.selectedCategoryFilter = nil
+                                    viewModel.selectedSubCategoryFilter = nil
                                 }
-
-                                Button(action: { showingAddTransaction = true }) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(AppTheme.accent)
+                            }
+                            if let subCategory = viewModel.selectedSubCategoryFilter {
+                                FilterChip(text: subCategory.name ?? "Subcategory", icon: subCategory.displayIcon) {
+                                    viewModel.selectedSubCategoryFilter = nil
                                 }
                             }
                         }
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                     }
-                    .sheet(isPresented: $showingAddTransaction) {
-                        AddTransactionView()
-                    }
-                    .searchable(text: Binding(
-                        get: { viewModel.searchText },
-                        set: { viewModel.searchText = $0 }
-                    ), prompt: "Search transactions")
-                    // MVVM: Error handling
-                    .alert("Error", isPresented: Binding(
-                        get: { viewModel.errorMessage != nil },
-                        set: { if !$0 { viewModel.errorMessage = nil } }
-                    )) {
-                        Button("OK") {
-                            viewModel.errorMessage = nil
+                    .background(AppTheme.secondaryBackground)
+                }
+
+                FilteredTransactionList(
+                    viewModel: viewModel,
+                    onAddTap: { showingAddTransaction = true }
+                )
+            }
+        }
+        .navigationTitle("Transactions")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack {
+                    Menu {
+                        Picker("Date Range", selection: Binding(
+                            get: { viewModel.selectedDateFilter },
+                            set: { viewModel.selectedDateFilter = $0 }
+                        )) {
+                            ForEach(DateFilter.allCases) { filter in
+                                Text(filter.rawValue).tag(filter)
+                            }
                         }
-                    } message: {
-                        if let error = viewModel.errorMessage {
-                            Text(error)
+
+                        Divider()
+
+                        if !categories.isEmpty {
+                            Menu("Category") {
+                                Button("All Categories") {
+                                    viewModel.selectedCategoryFilter = nil
+                                    viewModel.selectedSubCategoryFilter = nil
+                                }
+                                ForEach(categories) { category in
+                                    Button(category.name ?? "Unknown") {
+                                        viewModel.selectedCategoryFilter = category
+                                        viewModel.selectedSubCategoryFilter = nil
+                                    }
+                                }
+                            }
                         }
+
+                        if let category = viewModel.selectedCategoryFilter,
+                           let subcategories = category.subCategories?.allObjects as? [SubCategory],
+                           !subcategories.isEmpty {
+                            Menu("Subcategory") {
+                                Button("All Subcategories") {
+                                    viewModel.selectedSubCategoryFilter = nil
+                                }
+                                ForEach(subcategories.sorted { $0.order < $1.order }) { subCategory in
+                                    Button(subCategory.name ?? "Unknown") {
+                                        viewModel.selectedSubCategoryFilter = subCategory
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor((viewModel.selectedDateFilter != .all || viewModel.selectedCategoryFilter != nil || viewModel.selectedSubCategoryFilter != nil) ? AppTheme.accent : AppTheme.textPrimary)
                     }
-                } else {
-                    ProgressView()
+
+                    Button(action: { showingAddTransaction = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(AppTheme.accent)
+                    }
                 }
             }
-            .onAppear {
-                if viewModel == nil {
-                    viewModel = container.makeTransactionListViewModel()
-                }
+        }
+        .sheet(isPresented: $showingAddTransaction) {
+            AddTransactionView()
+        }
+        .searchable(text: Binding(
+            get: { viewModel.searchText },
+            set: { viewModel.searchText = $0 }
+        ), prompt: "Search transactions")
+        // MVVM: Error handling
+        .alert("Error", isPresented: Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
+        )) {
+            Button("OK") {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            if let error = viewModel.errorMessage {
+                Text(error)
             }
         }
     }

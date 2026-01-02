@@ -21,12 +21,15 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var selectedAccount: Account?
     @Published var toAccount: Account?
     @Published var transactionDate: Date
+    @Published var title: String
+    @Published var merchant: String
     @Published var note: String
     @Published var splitItems: [SplitItemData] = []
 
     // Data from repositories
     @Published var categories: [Category] = []
     @Published var accounts: [Account] = []
+    @Published var merchantSuggestions: [String] = []
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -62,6 +65,8 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         self.selectedSubCategory = transaction.subCategory
         self.selectedAccount = transaction.account
         self.transactionDate = transaction.date ?? Date()
+        self.title = transaction.title ?? ""
+        self.merchant = transaction.merchant ?? ""
         self.note = transaction.notes ?? ""
 
         // Load data
@@ -163,6 +168,10 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         selectedSubCategory = nil
     }
 
+    func updateMerchantSuggestions() {
+        merchantSuggestions = transactionRepository.fetchUniqueMerchants(matching: merchant)
+    }
+
     func addSplitItem() {
         guard let amount = Double(amountString), amount > 0, let category = selectedCategory else {
             return
@@ -209,19 +218,20 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
             let finalAmount = splitItems.isEmpty ? newAmount : splitItems.reduce(0) { $0 + $1.amount }
 
             // Prepare title
-            let title = splitItems.isEmpty
-                ? (note.isEmpty ? selectedCategory?.name : note)
+            let transactionTitle = splitItems.isEmpty
+                ? (title.isEmpty ? (selectedCategory?.name ?? "Transaction") : title)
                 : "Split Transaction (\(splitItems.count) Items)"
 
             // Update main transaction
             let updateData = TransactionUpdateData(
-                title: title,
+                title: transactionTitle,
                 amount: finalAmount,
                 date: transactionDate,
                 type: selectedType,
                 account: newAccount,
                 category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
                 subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
+                merchant: merchant.isEmpty ? nil : merchant,
                 notes: note.isEmpty ? nil : note
             )
 
@@ -238,6 +248,7 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
                     account: toAccount,
                     category: nil,
                     subCategory: nil,
+                    merchant: nil,
                     notes: nil
                 )
                 try transactionRepository.updateTransaction(linkedTransaction, with: linkedData)

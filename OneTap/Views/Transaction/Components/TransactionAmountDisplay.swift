@@ -34,7 +34,7 @@ struct TransactionAmountDisplay: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
         .background(AppTheme.background)
     }
     

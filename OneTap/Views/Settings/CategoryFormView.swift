@@ -82,7 +82,7 @@ struct CategoryFormView: View {
                             .padding(.vertical, 8)
                         }
 
-                        Section("Subcategories") {
+                        Section {
                             ForEach(viewModel.subCategories) { sub in
                                 Button {
                                     startEditingSub(sub, viewModel: viewModel)
@@ -118,12 +118,26 @@ struct CategoryFormView: View {
                                     }
                                 }
                             }
+                            .onMove { from, to in
+                                Task {
+                                    await viewModel.moveSubCategory(from: from, to: to)
+                                }
+                            }
 
                             Button {
                                 startAddingSub(viewModel: viewModel)
                             } label: {
                                 Label("Add Subcategory", systemImage: "plus.circle.fill")
                                     .foregroundColor(AppTheme.accent)
+                            }
+                        } header: {
+                            HStack {
+                                Text("Subcategories")
+                                Spacer()
+                                Text("Drag to reorder")
+                                    .font(.caption)
+                                    .foregroundColor(AppTheme.textSecondary)
+                                    .textCase(.none)
                             }
                         }
                         .headerProminence(.increased)

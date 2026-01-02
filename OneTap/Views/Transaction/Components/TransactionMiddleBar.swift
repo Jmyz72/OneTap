@@ -18,24 +18,12 @@ struct TransactionMiddleBar: View {
     // Actions
     let onSubCategoryTap: () -> Void
     let onAccountTap: () -> Void
-    let onDateTap: () -> Void
     let onSplitTap: () -> Void
     let onNoteTap: () -> Void
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                // Subcategory Chip
-                if let category = selectedCategory, let subs = category.subCategories, subs.count > 0 {
-                    Button(action: onSubCategoryTap) {
-                        chipView(
-                            icon: "arrow.turn.down.right",
-                            text: selectedSubCategory?.name ?? "Subcategory",
-                            isActive: selectedSubCategory != nil
-                        )
-                    }
-                }
-                
                 // Account Chip
                 Button(action: onAccountTap) {
                     chipView(
@@ -44,16 +32,7 @@ struct TransactionMiddleBar: View {
                         isActive: selectedAccount != nil
                     )
                 }
-                
-                // Date Chip
-                Button(action: onDateTap) {
-                    chipView(
-                        icon: "calendar",
-                        text: Formatters.shortDate.string(from: transactionDate),
-                        isActive: true
-                    )
-                }
-                
+
                 // Split Chip (Expense only)
                 if selectedType == .expense {
                     Button(action: onSplitTap) {
@@ -64,7 +43,18 @@ struct TransactionMiddleBar: View {
                         )
                     }
                 }
-                
+
+                // Subcategory Chip
+                if let category = selectedCategory, let subs = category.subCategories, subs.count > 0 {
+                    Button(action: onSubCategoryTap) {
+                        chipView(
+                            icon: "arrow.turn.down.right",
+                            text: selectedSubCategory?.name ?? "Subcategory",
+                            isActive: selectedSubCategory != nil
+                        )
+                    }
+                }
+
                 // Note Chip
                 Button(action: onNoteTap) {
                     chipView(

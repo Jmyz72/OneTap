@@ -11,8 +11,11 @@ internal import CoreData
 struct SplitTransactionSheet: View {
     @Binding var items: [SplitItemData]
     var currencyCode: String
-    
+    var categories: [Category]
+
     @Environment(\.dismiss) private var dismiss
+    @State private var editingItemIndex: Int?
+    @State private var showingItemEdit = false
     
     var body: some View {
         NavigationStack {
@@ -43,27 +46,49 @@ struct SplitTransactionSheet: View {
                     }
                 } else {
                     List {
-                        ForEach(items) { item in
-                            HStack {
-                                Image(systemName: item.category?.iconName ?? "tag")
-                                    .foregroundColor(item.category?.colorView ?? .gray)
-                                
-                                VStack(alignment: .leading) {
-                                    Text(item.title.isEmpty ? (item.category?.name ?? "Item") : item.title)
-                                        .font(.system(size: 16, weight: .medium))
-                                        .foregroundColor(AppTheme.textPrimary)
-                                    if let catName = item.category?.name {
-                                        Text(catName)
-                                            .font(.caption)
-                                            .foregroundColor(AppTheme.textSecondary)
+                        ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                            Button(action: {
+                                editingItemIndex = index
+                                showingItemEdit = true
+                            }) {
+                                HStack {
+                                    Image(systemName: item.category?.iconName ?? "tag")
+                                        .foregroundColor(item.category?.colorView ?? .gray)
+
+                                    VStack(alignment: .leading) {
+                                        Text(item.title.isEmpty ? (item.category?.name ?? "Item") : item.title)
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(AppTheme.textPrimary)
+
+                                        HStack(spacing: 4) {
+                                            if let catName = item.category?.name {
+                                                Text(catName)
+                                                    .font(.caption)
+                                                    .foregroundColor(AppTheme.textSecondary)
+
+                                                if let subCatName = item.subCategory?.name {
+                                                    Text("•")
+                                                        .font(.caption)
+                                                        .foregroundColor(AppTheme.textSecondary)
+                                                    Text(subCatName)
+                                                        .font(.caption)
+                                                        .foregroundColor(AppTheme.textSecondary)
+                                                }
+                                            }
+                                        }
                                     }
+
+                                    Spacer()
+
+                                    Text(format(item.amount))
+                                        .foregroundColor(AppTheme.textPrimary)
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(AppTheme.textTertiary)
                                 }
-                                
-                                Spacer()
-                                
-                                Text(format(item.amount))
-                                    .foregroundColor(AppTheme.textPrimary)
                             }
+                            .buttonStyle(.plain)
                         }
                         .onDelete(perform: deleteItem)
                     }
@@ -77,6 +102,14 @@ struct SplitTransactionSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                }
+            }
+            .sheet(isPresented: $showingItemEdit) {
+                if let index = editingItemIndex {
+                    SplitItemEditView(
+                        item: $items[index],
+                        categories: categories
+                    )
                 }
             }
         }

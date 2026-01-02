@@ -128,6 +128,7 @@ class TransferService: TransferServiceProtocol {
             account: nil,
             category: nil,
             subCategory: nil,
+            merchant: nil,
             notes: nil
         ))
 
@@ -140,6 +141,7 @@ class TransferService: TransferServiceProtocol {
             account: destinationAccount,
             category: nil,
             subCategory: nil,
+            merchant: nil,
             notes: nil
         ))
 

@@ -18,6 +18,7 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
     @Published var searchText = ""
     @Published var selectedDateFilter: DateFilter = .all
     @Published var selectedCategoryFilter: Category?
+    @Published var selectedSubCategoryFilter: SubCategory?
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -67,16 +68,18 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
     // MARK: - Subscriptions
 
     private func setupSubscriptions() {
-        Publishers.CombineLatest3(
+        Publishers.CombineLatest4(
             $searchText,
             $selectedDateFilter,
-            $selectedCategoryFilter
+            $selectedCategoryFilter,
+            $selectedSubCategoryFilter
         )
-        .sink { [weak self] searchText, dateFilter, category in
+        .sink { [weak self] searchText, dateFilter, category, subCategory in
             self?.fetchTransactions(
                 searchText: searchText,
                 dateFilter: dateFilter,
-                category: category
+                category: category,
+                subCategory: subCategory
             )
         }
         .store(in: &cancellables)
@@ -87,10 +90,11 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
     private func fetchTransactions(
         searchText: String,
         dateFilter: DateFilter,
-        category: Category?
+        category: Category?,
+        subCategory: SubCategory?
     ) {
         loadingState = .loading
-        
+
         // Cancel previous subscription
         dataCancellable?.cancel()
 
@@ -107,6 +111,11 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
         // Category predicate
         if let category = category {
             predicates.append(NSPredicate(format: "category == %@", category))
+        }
+
+        // SubCategory predicate
+        if let subCategory = subCategory {
+            predicates.append(NSPredicate(format: "subCategory == %@", subCategory))
         }
 
         // Date predicate

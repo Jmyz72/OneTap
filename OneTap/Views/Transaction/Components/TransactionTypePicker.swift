@@ -15,6 +15,7 @@ struct TransactionTypePicker: View {
             }
         }
         .pickerStyle(.segmented)
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 }
