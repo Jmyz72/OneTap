@@ -9,7 +9,7 @@
 import Foundation
 import SwiftUI
 import Combine
-import CoreData
+internal import CoreData
 
 @MainActor
 class CategoryListViewModel: ObservableObject, ViewModelProtocol {
@@ -83,7 +83,7 @@ class CategoryListViewModel: ObservableObject, ViewModelProtocol {
         }
     }
 
-    func deleteExpenseCategory(at offsets: IndexSet) async {
+    func deleteExpenseCategories(at offsets: IndexSet) async {
         do {
             for index in offsets {
                 try categoryRepository.deleteCategory(expenseCategories[index])
@@ -94,12 +94,22 @@ class CategoryListViewModel: ObservableObject, ViewModelProtocol {
         }
     }
 
-    func deleteIncomeCategory(at offsets: IndexSet) async {
+    func deleteIncomeCategories(at offsets: IndexSet) async {
         do {
             for index in offsets {
                 try categoryRepository.deleteCategory(incomeCategories[index])
             }
             try categoryRepository.save()
+        } catch {
+            handleError(error)
+        }
+    }
+
+    func resetCategories() async {
+        loadingState = .loading
+        do {
+            try categoryRepository.resetToDefaults()
+            loadingState = .loaded
         } catch {
             handleError(error)
         }

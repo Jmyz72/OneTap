@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import Combine
+internal import CoreData
 
 @MainActor
 class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
@@ -23,23 +24,34 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var note: String
     @Published var splitItems: [SplitItemData] = []
 
+    // Data from repositories
+    @Published var categories: [Category] = []
+    @Published var accounts: [Account] = []
+
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
 
     // MARK: - Dependencies
     private let transaction: Transaction
     private let transactionRepository: TransactionRepository
+    private let accountRepository: AccountRepository
+    private let categoryRepository: CategoryRepository
     private let transferService: TransferService
     private let balanceService: BalanceService
+    private var cancellables = Set<AnyCancellable>()
 
     init(
         transaction: Transaction,
         transactionRepository: TransactionRepository,
+        accountRepository: AccountRepository,
+        categoryRepository: CategoryRepository,
         transferService: TransferService,
         balanceService: BalanceService
     ) {
         self.transaction = transaction
         self.transactionRepository = transactionRepository
+        self.accountRepository = accountRepository
+        self.categoryRepository = categoryRepository
         self.transferService = transferService
         self.balanceService = balanceService
 
@@ -51,6 +63,10 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         self.selectedAccount = transaction.account
         self.transactionDate = transaction.date ?? Date()
         self.note = transaction.notes ?? ""
+
+        // Load data
+        loadData()
+        observeData()
 
         // Load split items
         loadSplitItems()
@@ -84,6 +100,38 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         }
     }
 
+    // MARK: - Data Loading
+
+    private func loadData() {
+        // Initial fetch
+        accounts = accountRepository.fetchAccounts(group: nil)
+        categories = categoryRepository.fetchCategories(type: nil)
+    }
+
+    private func observeData() {
+        // Observe accounts
+        accountRepository.accountsPublisher()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [weak self] accounts in
+                    self?.accounts = accounts
+                }
+            )
+            .store(in: &cancellables)
+
+        // Observe categories
+        categoryRepository.categoriesPublisher(type: nil)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [weak self] categories in
+                    self?.categories = categories
+                }
+            )
+            .store(in: &cancellables)
+    }
+
     // MARK: - Private Helpers
 
     private func loadSplitItems() {
@@ -110,6 +158,10 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     }
 
     // MARK: - Actions
+
+    func categoryChanged() {
+        selectedSubCategory = nil
+    }
 
     func addSplitItem() {
         guard let amount = Double(amountString), amount > 0, let category = selectedCategory else {

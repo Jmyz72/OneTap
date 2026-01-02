@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import CoreData
+internal import CoreData
 
 protocol TransferServiceProtocol {
     func createTransfer(
@@ -28,11 +28,12 @@ protocol TransferServiceProtocol {
     func deleteTransfer(sourceTransaction: Transaction) async throws
 }
 
+@MainActor
 class TransferService: TransferServiceProtocol {
     private let transactionRepository: TransactionRepository
     private let balanceService: BalanceService
 
-    nonisolated init(transactionRepository: TransactionRepository, balanceService: BalanceService) {
+    init(transactionRepository: TransactionRepository, balanceService: BalanceService) {
         self.transactionRepository = transactionRepository
         self.balanceService = balanceService
     }

@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CoreData
+internal import CoreData
 import Combine
 
 class TransactionRepository: BaseRepository {
@@ -22,13 +22,20 @@ class TransactionRepository: BaseRepository {
     // MARK: - Publishers
 
     func transactionsPublisher(for accountID: NSManagedObjectID, from date: Date?) -> AnyPublisher<[Transaction], Error> {
-        let subject = PassthroughSubject<[Transaction], Error>()
+        let initialTransactions: [Transaction]
+        if let account = (try? context.existingObject(with: accountID)) as? Account {
+            initialTransactions = fetchTransactions(for: account, from: date, to: nil, sortAscending: false)
+        } else {
+            initialTransactions = []
+        }
+        
+        let subject = CurrentValueSubject<[Transaction], Error>(initialTransactions)
 
         // Observe Core Data changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
-                if let account = self.findByID(accountID) as? Account {
+                if let account = (try? self.context.existingObject(with: accountID)) as? Account {
                     let transactions = self.fetchTransactions(
                         for: account,
                         from: date,
@@ -40,17 +47,19 @@ class TransactionRepository: BaseRepository {
             }
             .store(in: &cancellables)
 
-        // Send initial value
-        if let account = findByID(accountID) as? Account {
-            let transactions = fetchTransactions(for: account, from: date, to: nil, sortAscending: false)
-            subject.send(transactions)
-        }
-
         return subject.eraseToAnyPublisher()
     }
 
     func transactionsByDatePublisher(predicate: NSPredicate?) -> AnyPublisher<[String: [Transaction]], Error> {
-        let subject = PassthroughSubject<[String: [Transaction]], Error>()
+        let transactions = fetch(predicate: predicate, sortDescriptors: [
+            NSSortDescriptor(keyPath: \Transaction.date, ascending: false)
+        ])
+        let grouped = Dictionary(grouping: transactions) { transaction in
+            guard let date = transaction.date else { return "" }
+            return Formatters.date.string(from: date)
+        }
+        
+        let subject = CurrentValueSubject<[String: [Transaction]], Error>(grouped)
 
         // Observe Core Data changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
@@ -66,16 +75,6 @@ class TransactionRepository: BaseRepository {
                 subject.send(grouped)
             }
             .store(in: &cancellables)
-
-        // Send initial value
-        let transactions = fetch(predicate: predicate, sortDescriptors: [
-            NSSortDescriptor(keyPath: \Transaction.date, ascending: false)
-        ])
-        let grouped = Dictionary(grouping: transactions) { transaction in
-            guard let date = transaction.date else { return "" }
-            return Formatters.date.string(from: date)
-        }
-        subject.send(grouped)
 
         return subject.eraseToAnyPublisher()
     }

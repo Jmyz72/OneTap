@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
-import CoreData
+internal import CoreData
 
 @MainActor
 class AccountDetailViewModel: ObservableObject, ViewModelProtocol {
@@ -75,5 +75,15 @@ class AccountDetailViewModel: ObservableObject, ViewModelProtocol {
     func formatBalance() -> String {
         let formatter = Formatters.currencyFormatter(for: account.currency ?? SettingsManager.shared.currencyCode)
         return formatter.string(from: NSNumber(value: account.balance)) ?? "$0.00"
+    }
+
+    func formatCurrency(_ amount: Double) -> String {
+        let formatter = Formatters.currencyFormatter(for: account.currency ?? SettingsManager.shared.currencyCode)
+        return formatter.string(from: NSNumber(value: amount)) ?? "$0.00"
+    }
+
+    func formatDate(_ date: Date?) -> String {
+        guard let date = date else { return "N/A" }
+        return Formatters.date.string(from: date)
     }
 }

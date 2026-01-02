@@ -57,6 +57,7 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
     // MARK: - Dependencies
     private let transactionRepository: TransactionRepository
     private var cancellables = Set<AnyCancellable>()
+    private var dataCancellable: AnyCancellable?
 
     init(transactionRepository: TransactionRepository) {
         self.transactionRepository = transactionRepository
@@ -71,7 +72,6 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
             $selectedDateFilter,
             $selectedCategoryFilter
         )
-        .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
         .sink { [weak self] searchText, dateFilter, category in
             self?.fetchTransactions(
                 searchText: searchText,
@@ -90,6 +90,9 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
         category: Category?
     ) {
         loadingState = .loading
+        
+        // Cancel previous subscription
+        dataCancellable?.cancel()
 
         // Build predicates
         var predicates: [NSPredicate] = []
@@ -112,21 +115,19 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
         }
 
         let finalPredicate = predicates.isEmpty ? nil : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-        let sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
 
-        let transactions = transactionRepository.fetch(predicate: finalPredicate, sortDescriptors: sortDescriptors)
-        processSections(transactions)
-        loadingState = .loaded
-    }
-
-    private func processSections(_ transactions: [Transaction]) {
-        let grouped = Dictionary(grouping: transactions) { transaction in
-            guard let date = transaction.date else { return "" }
-            return Formatters.date.string(from: date)
-        }
-
-        sectionedTransactions = grouped
-        sections = grouped.keys.sorted(by: >)
+        // Subscribe to live updates
+        dataCancellable = transactionRepository.transactionsByDatePublisher(predicate: finalPredicate)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure(let error) = completion {
+                    self?.handleError(error)
+                }
+            } receiveValue: { [weak self] groupedTransactions in
+                self?.sectionedTransactions = groupedTransactions
+                self?.sections = groupedTransactions.keys.sorted(by: >)
+                self?.loadingState = .loaded
+            }
     }
 
     // MARK: - Helpers

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+internal import CoreData
 
 struct AddAccountView: View {
     @Environment(\.dismiss) private var dismiss
@@ -22,47 +23,12 @@ struct AddAccountView: View {
                 ForEach(AccountTemplate.allGroups) { group in
                     Section(header: Text(group.group.rawValue)) {
                         ForEach(group.templates) { template in
-                            NavigationLink(destination: AccountFormView(rootIsPresented: $isPresented, template: template)) {
-                                HStack(spacing: 12) {
-                                    AccountIconView(
-                                        iconName: template.displayIcon,
-                                        color: template.type.color,
-                                        size: 20 // Adjusted for list view
-                                    )
-                                    
-                                    VStack(alignment: .leading) {
-                                        Text(template.name)
-                                            .font(.body)
-                                        if !template.institution.isEmpty {
-                                            Text(template.institution)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
+                            accountTemplateRow(for: template)
                         }
                     }
                 }
                 
-                // Option to create a custom account manually
-                Section {
-                    NavigationLink(destination: AccountFormView(rootIsPresented: $isPresented, template: nil)) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.gray)
-                                .clipShape(Circle())
-                            
-                            Text("Other / Custom Account")
-                                .font(.body)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
+                customAccountSection
             }
             .navigationTitle("Select Account Type")
             .toolbar {
@@ -71,6 +37,48 @@ struct AddAccountView: View {
                         isPresented = false
                     }
                 }
+            }
+        }
+    }
+    
+    private func accountTemplateRow(for template: AccountTemplate) -> some View {
+        NavigationLink(destination: AccountFormView(template: template, rootIsPresented: $isPresented)) {
+            HStack(spacing: 12) {
+                AccountIconView(
+                    iconName: template.displayIcon,
+                    color: template.type.color,
+                    size: 20 // Adjusted for list view
+                )
+                
+                VStack(alignment: .leading) {
+                    Text(template.name)
+                        .font(.body)
+                    if !template.institution.isEmpty {
+                        Text(template.institution)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+    
+    private var customAccountSection: some View {
+        Section {
+            NavigationLink(destination: AccountFormView(template: nil, rootIsPresented: $isPresented)) {
+                HStack(spacing: 12) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.gray)
+                        .clipShape(Circle())
+                    
+                    Text("Other / Custom Account")
+                        .font(.body)
+                }
+                .padding(.vertical, 4)
             }
         }
     }

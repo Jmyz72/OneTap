@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import Combine
+internal import CoreData
 
 @MainActor
 class AccountFormViewModel: ObservableObject, ViewModelProtocol {
@@ -29,8 +30,8 @@ class AccountFormViewModel: ObservableObject, ViewModelProtocol {
     @Published var errorMessage: String?
 
     // MARK: - Dependencies
+    let template: AccountTemplate?
     private let account: Account?
-    private let template: AccountTemplate?
     private let accountRepository: AccountRepository
     private let transactionRepository: TransactionRepository
     private let balanceService: BalanceService

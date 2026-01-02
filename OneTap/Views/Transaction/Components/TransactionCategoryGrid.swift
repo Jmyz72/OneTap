@@ -4,10 +4,10 @@
 //
 
 import SwiftUI
-import CoreData
+internal import CoreData
 
 struct TransactionCategoryGrid: View {
-    let categories: FetchedResults<Category>
+    let categories: [Category]
     let selectedType: TransactionType
     @Binding var selectedCategory: Category?
     

@@ -6,134 +6,141 @@
 //
 
 import SwiftUI
-import CoreData
+internal import CoreData
 
 struct AccountDetailView: View {
     @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) var dismiss
 
     let account: Account
-    @StateObject private var viewModel: AccountDetailViewModel
+    @State private var viewModel: AccountDetailViewModel?
 
     // UI State (view-only state)
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
 
-    init(account: Account) {
-        self.account = account
-        // Create temporary container and ViewModel
-        let tempContainer = DependencyContainer()
-        _viewModel = StateObject(wrappedValue: tempContainer.makeAccountDetailViewModel(account: account))
-    }
-
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Account Header Card
-                accountHeaderCard
+        Group {
+            if let viewModel {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Account Header Card
+                        accountHeaderCard(viewModel: viewModel)
 
-                // Credit Card Visualization (if available)
-                if let last4 = account.lastFourDigits, !last4.isEmpty {
-                    creditCardView(last4: last4)
-                }
+                        // Credit Card Visualization (if available)
+                        if let last4 = account.lastFourDigits, !last4.isEmpty {
+                            creditCardView(last4: last4)
+                        }
 
-                // Quick Stats
-                quickStatsCard
+                        // Quick Stats
+                        quickStatsCard(viewModel: viewModel)
 
-                // Transactions Header
-                HStack {
-                    Text("History")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                    Spacer()
-                }
+                        // Transactions Header
+                        HStack {
+                            Text("History")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(AppTheme.textPrimary)
+                            Spacer()
+                        }
 
-                // Transaction List
-                AccountTransactionList(account: account)
-            }
-            .padding(20)
-        }
-        .background(AppTheme.background.ignoresSafeArea())
-        .navigationTitle(account.name ?? "Account")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button {
-                        showingEditSheet = true
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
+                        // Transaction List
+                        AccountTransactionList(account: account)
                     }
-
-                    Button(role: .destructive) {
-                        showingDeleteAlert = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 20))
-                        .foregroundColor(AppTheme.textPrimary)
+                    .padding(20)
                 }
-            }
-        }
-        .toolbarBackground(AppTheme.background, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .sheet(isPresented: $showingEditSheet) {
-            NavigationStack {
-                AccountFormView(accountToEdit: account)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                showingEditSheet = false
+                .background(AppTheme.background.ignoresSafeArea())
+                .navigationTitle(account.name ?? "Account")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Menu {
+                            Button {
+                                showingEditSheet = true
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
                             }
+
+                            Button(role: .destructive) {
+                                showingDeleteAlert = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 20))
+                                .foregroundColor(AppTheme.textPrimary)
                         }
                     }
-            }
-        }
-        .alert("Delete Account", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                Task {
-                    await viewModel.deleteAccount()
                 }
-            }
-        } message: {
-            Text("Are you sure you want to delete this account? This action cannot be undone.")
-        }
-        // MVVM: Error handling
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            if let error = viewModel.errorMessage {
-                Text(error)
-            }
-        }
-        // MVVM: Loading overlay
-        .overlay {
-            if viewModel.loadingState.isLoading {
-                ZStack {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
+                .toolbarBackground(AppTheme.background, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .sheet(isPresented: $showingEditSheet) {
+                    NavigationStack {
+                        AccountFormView(accountToEdit: account)
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button("Cancel") {
+                                        showingEditSheet = false
+                                    }
+                                }
+                            }
+                    }
+                }
+                .alert("Delete Account", isPresented: $showingDeleteAlert) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            await viewModel.deleteAccount()
+                        }
+                    }
+                } message: {
+                    Text("Are you sure you want to delete this account? This action cannot be undone.")
+                }
+                // MVVM: Error handling
+                .alert("Error", isPresented: Binding(
+                    get: { viewModel.errorMessage != nil },
+                    set: { if !$0 { viewModel.errorMessage = nil } }
+                )) {
+                    Button("OK") {
+                        viewModel.errorMessage = nil
+                    }
+                } message: {
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                    }
+                }
+                // MVVM: Loading overlay
+                .overlay {
+                    if viewModel.loadingState.isLoading {
+                        ZStack {
+                            Color.black.opacity(0.4)
+                                .ignoresSafeArea()
 
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .tint(.white)
+                        }
+                    }
                 }
+                // MVVM: Auto-dismiss on success (after delete)
+                .onChange(of: viewModel.loadingState) { _, newState in
+                    if newState == .loaded {
+                        dismiss()
+                    }
+                }
+                .preferredColorScheme(.dark)
+            } else {
+                ProgressView()
             }
         }
-        // MVVM: Auto-dismiss on success (after delete)
-        .onChange(of: viewModel.loadingState) { _, newState in
-            if newState == .loaded {
-                dismiss()
+        .onAppear {
+            if viewModel == nil {
+                viewModel = container.makeAccountDetailViewModel(account: account)
             }
         }
-        .preferredColorScheme(.dark)
     }
 
-    private var accountHeaderCard: some View {
+    private func accountHeaderCard(viewModel: AccountDetailViewModel) -> some View {
         VStack(spacing: 24) {
             // Icon
             AccountIconView(
@@ -303,7 +310,7 @@ struct AccountDetailView: View {
         )
     }
 
-    private var quickStatsCard: some View {
+    private func quickStatsCard(viewModel: AccountDetailViewModel) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Details")
                 .font(.system(size: 18, weight: .bold))

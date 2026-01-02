@@ -5,7 +5,7 @@
 //  Created by Jimmy Hew on 29/12/2025.
 //
 
-import CoreData
+internal import CoreData
 
 class PersistenceController {
     static let shared = PersistenceController()
@@ -153,6 +153,31 @@ class PersistenceController {
             }
         } catch {
             print("Error checking categories: \(error)")
+        }
+    }
+    
+    func deleteAllData() async throws {
+        // Use viewContext directly for simplicity and immediate UI updates for this rare action
+        // or use performBackgroundTask but ensure strict saving
+        
+        await container.viewContext.perform {
+            // Entities to delete (order matters less for cascade, but good practice)
+            let entities = ["TransactionItem", "Transaction", "Account", "SubCategory", "Category"]
+            
+            for entityName in entities {
+                let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: entityName)
+                if let objects = try? self.container.viewContext.fetch(fetchRequest) {
+                    for object in objects {
+                        self.container.viewContext.delete(object)
+                    }
+                }
+            }
+            
+            // Save deletion
+            try? self.container.viewContext.save()
+            
+            // Re-seed default categories
+            Category.seedDefaults(context: self.container.viewContext)
         }
     }
 

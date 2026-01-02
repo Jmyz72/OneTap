@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import Combine
+internal import CoreData
 
 @MainActor
 class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
@@ -23,25 +24,39 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var note = ""
     @Published var splitItems: [SplitItemData] = []
 
+    // Data from repositories
+    @Published var categories: [Category] = []
+    @Published var accounts: [Account] = []
+
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
 
     // MARK: - Dependencies
     private let transactionRepository: TransactionRepository
+    private let accountRepository: AccountRepository
+    private let categoryRepository: CategoryRepository
     private let transferService: TransferService
     private let balanceService: BalanceService
     private let validationService: ValidationService
+    private var cancellables = Set<AnyCancellable>()
 
     init(
         transactionRepository: TransactionRepository,
+        accountRepository: AccountRepository,
+        categoryRepository: CategoryRepository,
         transferService: TransferService,
         balanceService: BalanceService,
         validationService: ValidationService
     ) {
         self.transactionRepository = transactionRepository
+        self.accountRepository = accountRepository
+        self.categoryRepository = categoryRepository
         self.transferService = transferService
         self.balanceService = balanceService
         self.validationService = validationService
+
+        observeData()
+        setupDefaults()
     }
 
     // MARK: - Computed Properties
@@ -68,9 +83,48 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         }
     }
 
+    // MARK: - Observation
+
+    private func observeData() {
+        // Observe accounts
+        accountRepository.accountsPublisher()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [weak self] accounts in
+                    self?.accounts = accounts
+                    // Set default account if none selected
+                    if self?.selectedAccount == nil {
+                        self?.selectedAccount = accounts.first
+                    }
+                }
+            )
+            .store(in: &cancellables)
+
+        // Observe categories
+        categoryRepository.categoriesPublisher(type: nil)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { [weak self] categories in
+                    guard let self = self else { return }
+                    self.categories = categories
+                    // Set default category if none selected
+                    if self.selectedCategory == nil {
+                        self.selectedCategory = categories.first { $0.typeEnum == self.selectedType }
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
+
     // MARK: - Actions
 
-    func setupDefaults(accounts: [Account], categories: [Category]) {
+    private func setupDefaults() {
+        // Initial fetch to set defaults
+        accounts = accountRepository.fetchAccounts(group: nil)
+        categories = categoryRepository.fetchCategories(type: nil)
+
         if selectedAccount == nil {
             selectedAccount = accounts.first
         }
@@ -79,7 +133,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         }
     }
 
-    func typeChanged(to newType: TransactionType, categories: [Category]) {
+    func typeChanged(to newType: TransactionType) {
         if newType != .transfer {
             selectedCategory = categories.first { $0.typeEnum == newType }
             selectedSubCategory = nil

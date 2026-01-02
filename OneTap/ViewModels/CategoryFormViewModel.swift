@@ -7,7 +7,7 @@
 
 import Foundation
 import SwiftUI
-import CoreData
+internal import CoreData
 import Combine
 
 @MainActor
@@ -18,6 +18,7 @@ class CategoryFormViewModel: ObservableObject, ViewModelProtocol {
     @Published var color = "blue"
     @Published var type: TransactionType = .expense
     @Published var subCategories: [SubCategory] = []
+    @Published var editingSubCategory: SubCategory?
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -93,6 +94,34 @@ class CategoryFormViewModel: ObservableObject, ViewModelProtocol {
             try categoryRepository.save()
             finishLoading()
 
+        } catch {
+            handleError(error)
+        }
+    }
+
+    func saveSubCategory(name: String, icon: String) {
+        Task {
+            if let sub = editingSubCategory {
+                await updateSubCategory(sub, name: name, icon: icon)
+            } else {
+                await addSubCategory(name: name, icon: icon)
+            }
+        }
+    }
+
+    func updateSubCategory(_ sub: SubCategory, name: String, icon: String) async {
+        do {
+            // Logic to update subcategory would go here in Repository
+            // For now, simple direct update as we don't have a dedicated repo method yet or using BaseRepository generic update?
+            // Actually, let's just update the object since it's managed context
+            sub.name = name
+            sub.icon = icon
+            try categoryRepository.save()
+            
+            // Reload
+            if let category = category, let subs = category.subCategories?.allObjects as? [SubCategory] {
+                subCategories = subs.sorted { $0.order < $1.order }
+            }
         } catch {
             handleError(error)
         }

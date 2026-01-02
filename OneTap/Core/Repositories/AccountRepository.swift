@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CoreData
+internal import CoreData
 import Combine
 
 class AccountRepository: BaseRepository {
@@ -22,7 +22,8 @@ class AccountRepository: BaseRepository {
     // MARK: - Publishers
 
     func accountsPublisher() -> AnyPublisher<[Account], Error> {
-        let subject = PassthroughSubject<[Account], Error>()
+        let initialAccounts = fetchAccounts(group: nil)
+        let subject = CurrentValueSubject<[Account], Error>(initialAccounts)
 
         // Observe Core Data changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
@@ -33,29 +34,21 @@ class AccountRepository: BaseRepository {
             }
             .store(in: &cancellables)
 
-        // Send initial value
-        let accounts = fetchAccounts(group: nil)
-        subject.send(accounts)
-
         return subject.eraseToAnyPublisher()
     }
 
-    func accountPublisher(for id: NSManagedObjectID) -> AnyPublisher<Account, Error> {
-        let subject = PassthroughSubject<Account, Error>()
+    func accountPublisher(for id: NSManagedObjectID) -> AnyPublisher<Account?, Error> {
+        let initialAccount = findByID(id)
+        let subject = CurrentValueSubject<Account?, Error>(initialAccount)
 
         // Observe Core Data changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
             .sink { [weak self] _ in
-                guard let self = self,
-                      let account = self.findByID(id) else { return }
+                guard let self = self else { return }
+                let account = self.findByID(id)
                 subject.send(account)
             }
             .store(in: &cancellables)
-
-        // Send initial value
-        if let account = findByID(id) {
-            subject.send(account)
-        }
 
         return subject.eraseToAnyPublisher()
     }

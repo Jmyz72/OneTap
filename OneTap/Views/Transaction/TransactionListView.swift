@@ -6,12 +6,12 @@
 //
 
 import SwiftUI
-import CoreData
+internal import CoreData
 
 struct TransactionListView: View {
     @EnvironmentObject private var container: DependencyContainer
 
-    @StateObject private var viewModel: TransactionListViewModel
+    @State private var viewModel: TransactionListViewModel?
 
     // UI State (view-only state)
     @State private var showingAddTransaction = false
@@ -22,96 +22,110 @@ struct TransactionListView: View {
         animation: .default
     ) private var categories: FetchedResults<Category>
 
-    init() {
-        // Create temporary container and ViewModel
-        let tempContainer = DependencyContainer()
-        _viewModel = StateObject(wrappedValue: tempContainer.makeTransactionListViewModel())
-    }
-
     var body: some View {
         NavigationStack {
-            ZStack {
-                AppTheme.background.ignoresSafeArea()
+            Group {
+                if let viewModel {
+                    ZStack {
+                        AppTheme.background.ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    // Filter Status Bar
-                    if viewModel.selectedCategoryFilter != nil || viewModel.selectedDateFilter != .all {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack {
-                                if viewModel.selectedDateFilter != .all {
-                                    FilterChip(text: viewModel.selectedDateFilter.rawValue, icon: "calendar") {
-                                        viewModel.selectedDateFilter = .all
-                                    }
-                                }
-                                if let category = viewModel.selectedCategoryFilter {
-                                    FilterChip(text: category.name ?? "Category", icon: category.iconName) {
-                                        viewModel.selectedCategoryFilter = nil
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                        }
-                        .background(AppTheme.secondaryBackground)
-                    }
-
-                    FilteredTransactionList(
-                        viewModel: viewModel,
-                        onAddTap: { showingAddTransaction = true }
-                    )
-                }
-            }
-            .navigationTitle("Transactions")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-                        Menu {
-                            Picker("Date Range", selection: $viewModel.selectedDateFilter) {
-                                ForEach(DateFilter.allCases) { filter in
-                                    Text(filter.rawValue).tag(filter)
-                                }
-                            }
-
-                            Divider()
-
-                            if !categories.isEmpty {
-                                Menu("Category") {
-                                    Button("All Categories") {
-                                        viewModel.selectedCategoryFilter = nil
-                                    }
-                                    ForEach(categories) { category in
-                                        Button(category.name ?? "Unknown") {
-                                            viewModel.selectedCategoryFilter = category
+                        VStack(spacing: 0) {
+                            // Filter Status Bar
+                            if viewModel.selectedCategoryFilter != nil || viewModel.selectedDateFilter != .all {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack {
+                                        if viewModel.selectedDateFilter != .all {
+                                            FilterChip(text: viewModel.selectedDateFilter.rawValue, icon: "calendar") {
+                                                viewModel.selectedDateFilter = .all
+                                            }
+                                        }
+                                        if let category = viewModel.selectedCategoryFilter {
+                                            FilterChip(text: category.name ?? "Category", icon: category.iconName) {
+                                                viewModel.selectedCategoryFilter = nil
+                                            }
                                         }
                                     }
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
                                 }
+                                .background(AppTheme.secondaryBackground)
                             }
-                        } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                .font(.system(size: 20))
-                                .foregroundColor((viewModel.selectedDateFilter != .all || viewModel.selectedCategoryFilter != nil) ? AppTheme.accent : AppTheme.textPrimary)
-                        }
 
-                        Button(action: { showingAddTransaction = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(AppTheme.accent)
+                            FilteredTransactionList(
+                                viewModel: viewModel,
+                                onAddTap: { showingAddTransaction = true }
+                            )
                         }
                     }
+                    .navigationTitle("Transactions")
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            HStack {
+                                Menu {
+                                    Picker("Date Range", selection: Binding(
+                                        get: { viewModel.selectedDateFilter },
+                                        set: { viewModel.selectedDateFilter = $0 }
+                                    )) {
+                                        ForEach(DateFilter.allCases) { filter in
+                                            Text(filter.rawValue).tag(filter)
+                                        }
+                                    }
+
+                                    Divider()
+
+                                    if !categories.isEmpty {
+                                        Menu("Category") {
+                                            Button("All Categories") {
+                                                viewModel.selectedCategoryFilter = nil
+                                            }
+                                            ForEach(categories) { category in
+                                                Button(category.name ?? "Unknown") {
+                                                    viewModel.selectedCategoryFilter = category
+                                                }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    Image(systemName: "line.3.horizontal.decrease.circle")
+                                        .font(.system(size: 20))
+                                        .foregroundColor((viewModel.selectedDateFilter != .all || viewModel.selectedCategoryFilter != nil) ? AppTheme.accent : AppTheme.textPrimary)
+                                }
+
+                                Button(action: { showingAddTransaction = true }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(AppTheme.accent)
+                                }
+                            }
+                        }
+                    }
+                    .sheet(isPresented: $showingAddTransaction) {
+                        AddTransactionView()
+                    }
+                    .searchable(text: Binding(
+                        get: { viewModel.searchText },
+                        set: { viewModel.searchText = $0 }
+                    ), prompt: "Search transactions")
+                    // MVVM: Error handling
+                    .alert("Error", isPresented: Binding(
+                        get: { viewModel.errorMessage != nil },
+                        set: { if !$0 { viewModel.errorMessage = nil } }
+                    )) {
+                        Button("OK") {
+                            viewModel.errorMessage = nil
+                        }
+                    } message: {
+                        if let error = viewModel.errorMessage {
+                            Text(error)
+                        }
+                    }
+                } else {
+                    ProgressView()
                 }
             }
-            .sheet(isPresented: $showingAddTransaction) {
-                AddTransactionView()
-            }
-            .searchable(text: $viewModel.searchText, prompt: "Search transactions")
-            // MVVM: Error handling
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") {
-                    viewModel.errorMessage = nil
-                }
-            } message: {
-                if let error = viewModel.errorMessage {
-                    Text(error)
+            .onAppear {
+                if viewModel == nil {
+                    viewModel = container.makeTransactionListViewModel()
                 }
             }
         }
@@ -128,7 +142,7 @@ struct FilteredTransactionList: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(viewModel.sortedSectionKeys, id: \.self) { sectionKey in
+                    ForEach(viewModel.sections, id: \.self) { sectionKey in
                         if let transactions = viewModel.sectionedTransactions[sectionKey] {
                             dateHeader(for: sectionKey, transactions: transactions)
 

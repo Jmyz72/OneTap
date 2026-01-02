@@ -7,7 +7,7 @@
 
 import Foundation
 import SwiftUI
-import CoreData
+internal import CoreData
 
 enum AccountType: String, CaseIterable, Identifiable {
     case checking = "Checking"

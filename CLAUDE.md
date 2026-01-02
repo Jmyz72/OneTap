@@ -2,6 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 📚 Documentation Index
+
+For comprehensive guidance, refer to these documentation files:
+
+- **[BUILD_GUIDE.md](BUILD_GUIDE.md)** - Complete build and run instructions, troubleshooting, CI/CD setup
+- **[ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md)** - Detailed architecture overview, design patterns, data flow, threading model
+- **[FEATURE_IMPLEMENTATION_GUIDE.md](FEATURE_IMPLEMENTATION_GUIDE.md)** - Step-by-step guide to implementing new features with complete examples
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Code standards, git workflow, PR process, best practices
+
+**Quick Start:** New to the project? Read the guides in this order:
+1. BUILD_GUIDE.md - Get the project running
+2. ARCHITECTURE_GUIDE.md - Understand the structure
+3. FEATURE_IMPLEMENTATION_GUIDE.md - Learn to add features
+4. This file (CLAUDE.md) - Project-specific quick reference
+
+---
+
 ## Build & Run
 
 **Open Project:**
@@ -173,27 +190,55 @@ When modifying Core Data entities:
 
 ### Adding a New View
 
+**IMPORTANT:** All views follow the MVVM + Dependency Injection pattern. Views must:
+1. Use `@EnvironmentObject` to receive the DependencyContainer
+2. Use `@State` with optional ViewModel (lazy initialization)
+3. Initialize ViewModel in `.onAppear` using the injected container
+
 Follow the established pattern:
 ```swift
 import SwiftUI
 
 struct MyNewView: View {
-    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) private var dismiss
 
+    @State private var viewModel: MyNewViewModel?
+
     var body: some View {
-        NavigationStack {
-            // UI here
+        Group {
+            if let viewModel {
+                NavigationStack {
+                    // UI here with viewModel
+                }
+                .navigationTitle("Title")
+            } else {
+                ProgressView()
+            }
         }
-        .navigationTitle("Title")
+        .onAppear {
+            // Lazy initialization from injected container
+            if viewModel == nil {
+                viewModel = container.makeMyNewViewModel()
+            }
+        }
     }
 }
 
 #Preview {
     MyNewView()
-        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+        .environmentObject(DependencyContainer(persistenceController: .preview))
 }
 ```
+
+**Critical Pattern Rules:**
+- ❌ **NEVER** create `DependencyContainer()` in view initializers
+- ❌ **NEVER** use `@StateObject private var viewModel: MyViewModel`
+- ✅ **ALWAYS** use `@EnvironmentObject` for container injection
+- ✅ **ALWAYS** use `@State private var viewModel: MyViewModel?` with lazy init
+- ✅ **ALWAYS** initialize ViewModel in `.onAppear` using `container.makeXViewModel()`
+
+See [ARCHITECTURE_GUIDE.md](ARCHITECTURE_GUIDE.md#dependency-injection) for detailed explanation.
 
 ### Working with Account Groups
 

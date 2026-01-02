@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import CoreData
+internal import CoreData
 
 struct AccountTransactionList: View {
     @ObservedObject var account: Account
