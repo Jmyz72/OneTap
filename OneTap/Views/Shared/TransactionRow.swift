@@ -44,34 +44,35 @@ struct TransactionRow: View {
             }
 
             VStack(alignment: .leading, spacing: 5) {
-                Text(transaction.title ?? "Unknown Transaction")
+                // Main Text: Category or SubCategory
+                Text(mainDisplayJSON)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(AppTheme.textPrimary)
 
+                // Sub Text: Title • Merchant • Account
                 HStack(spacing: 4) {
-                    if let category = transaction.category {
-                        Text(category.name ?? "Unknown Category")
-                            .foregroundColor(categoryColor.opacity(0.9))
+                    if let title = transaction.title, !title.isEmpty {
+                        Text(title)
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    
+                    if let title = transaction.title, !title.isEmpty, (transaction.merchant != nil || transaction.account != nil) {
+                         Text("•")
+                            .foregroundColor(AppTheme.textTertiary)
+                    }
 
-                        if let subCategory = transaction.subCategory {
+                    if let merchant = transaction.merchant, !merchant.isEmpty {
+                        Text(merchant)
+                            .foregroundColor(AppTheme.textSecondary)
+                        
+                        if transaction.account != nil {
                             Text("•")
                                 .foregroundColor(AppTheme.textTertiary)
-                            Text(subCategory.name ?? "")
-                                .foregroundColor(AppTheme.textSecondary)
                         }
                     }
 
                     if let account = transaction.account {
-                        Text("•")
-                            .foregroundColor(AppTheme.textTertiary)
                         Text(account.name ?? "Unknown Account")
-                            .foregroundColor(AppTheme.textSecondary)
-                    }
-
-                    if transaction.merchant != nil {
-                        Text("•")
-                            .foregroundColor(AppTheme.textTertiary)
-                        Text(transaction.merchant!)
                             .foregroundColor(AppTheme.textSecondary)
                     }
                 }
@@ -87,7 +88,7 @@ struct TransactionRow: View {
                     .gradientForeground(amountGradient)
                     .shadow(color: amountColor.opacity(0.3), radius: 4, x: 0, y: 2)
 
-                Text(Formatters.shortDate.string(from: transaction.date ?? Date()))
+                Text(Formatters.time.string(from: transaction.date ?? Date()))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(AppTheme.textTertiary)
                     .padding(.horizontal, 8)
@@ -132,6 +133,13 @@ struct TransactionRow: View {
         .shadow(color: categoryColor.opacity(0.1), radius: 8, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+    }
+    
+    private var mainDisplayJSON: String {
+        if let sub = transaction.subCategory?.name {
+            return sub
+        }
+        return transaction.category?.name ?? "Uncategorized"
     }
     
     private var categoryColor: Color {

@@ -39,6 +39,7 @@ private struct EditTransactionContent: View {
     @State private var showingAccountPicker = false
     @State private var categoryForSubcategoryPicker: Category?
     @State private var showingNoteInput = false
+    @State private var showingMerchantInput = false
     @State private var showingSplitSheet = false
 
     @FocusState private var focusedField: TransactionDetailsInput.Field?
@@ -73,6 +74,10 @@ private struct EditTransactionContent: View {
             }
             .alert("Add Note", isPresented: $showingNoteInput) {
                 TextField("Note", text: $viewModel.note)
+                Button("Done") { }
+            }
+            .alert("Add Merchant", isPresented: $showingMerchantInput) {
+                TextField("Merchant Name", text: $viewModel.merchant)
                 Button("Done") { }
             }
             .alert("Error", isPresented: Binding(
@@ -113,78 +118,96 @@ private struct EditTransactionContent: View {
     // MARK: - Subviews
 
     private var mainContent: some View {
-        VStack(spacing: 0) {
-            if focusedField == nil {
-                TransactionTypePicker(selectedType: $viewModel.selectedType)
-
-                TransactionCategoryGrid(
-                    categories: viewModel.categories,
-                    selectedType: viewModel.selectedType,
-                    selectedCategory: $viewModel.selectedCategory,
-                    onCategoryTapped: { category in
-                        // Show subcategory sheet if category has subcategories
-                        if let subcategories = category.subCategories?.allObjects as? [SubCategory],
-                           !subcategories.isEmpty {
-                            categoryForSubcategoryPicker = category
-                        }
-                    }
-                )
-
-                Spacer()
-                
-                TransactionMiddleBar(
-                    selectedCategory: $viewModel.selectedCategory,
-                    selectedSubCategory: $viewModel.selectedSubCategory,
-                    selectedAccount: $viewModel.selectedAccount,
-                    transactionDate: $viewModel.transactionDate,
-                    splitItems: $viewModel.splitItems,
-                    note: $viewModel.note,
-                    selectedType: viewModel.selectedType,
-                    onSubCategoryTap: {
-                        if let category = viewModel.selectedCategory {
-                            categoryForSubcategoryPicker = category
-                        }
-                    },
-                    onAccountTap: { showingAccountPicker = true },
-                    onSplitTap: { showingSplitSheet = true },
-                    onNoteTap: { showingNoteInput = true }
-                )
-            } else {
-                Spacer()
+        ZStack {
+            // Background Layer
+            if focusedField != nil {
+                VStack(spacing: 0) {
+                    TransactionTypePicker(selectedType: $viewModel.selectedType)
+                    categoryGridView
+                    Spacer()
+                    middleBarView
+                    Spacer().frame(height: 100)
+                }
+                .opacity(0.3)
+                .allowsHitTesting(false)
             }
 
-            TransactionDetailsInput(
-                title: $viewModel.title,
-                merchant: $viewModel.merchant,
-                transactionDate: $viewModel.transactionDate,
-                merchantSuggestions: viewModel.merchantSuggestions,
-                onMerchantChanged: {
-                    viewModel.updateMerchantSuggestions()
-                },
-                onDateTap: { showingDatePicker = true },
-                focusedField: $focusedField
-            )
+            // Interactive Layer
+            VStack(spacing: 0) {
+                if focusedField == nil {
+                    TransactionTypePicker(selectedType: $viewModel.selectedType)
+                    categoryGridView
+                    Spacer()
+                    middleBarView
+                } else {
+                    Spacer()
+                }
 
-            TransactionAmountDisplay(
-                amountString: viewModel.amountString,
-                selectedAccount: viewModel.selectedAccount,
-                splitItems: viewModel.splitItems,
-                selectedType: viewModel.selectedType
-            )
-
-            if focusedField == nil {
-                CustomKeypad(
-                    value: $viewModel.amountString,
-                    onDone: {
-                        Task {
-                            await viewModel.saveChanges()
-                        }
-                    },
-                    onAddItem: nil
+                TransactionDetailsInput(
+                    title: $viewModel.title,
+                    transactionDate: $viewModel.transactionDate,
+                    onDateTap: { showingDatePicker = true },
+                    focusedField: $focusedField
                 )
-                .padding(.bottom, 10)
+
+                TransactionAmountDisplay(
+                    amountString: viewModel.amountString,
+                    selectedAccount: viewModel.selectedAccount,
+                    splitItems: viewModel.splitItems,
+                    selectedType: viewModel.selectedType
+                )
+
+                if focusedField == nil {
+                    CustomKeypad(
+                        value: $viewModel.amountString,
+                        onDone: {
+                            Task {
+                                await viewModel.saveChanges()
+                            }
+                        },
+                        onAddItem: nil
+                    )
+                    .padding(.bottom, 10)
+                }
             }
         }
+    }
+    
+    private var categoryGridView: some View {
+        TransactionCategoryGrid(
+            categories: viewModel.categories,
+            selectedType: viewModel.selectedType,
+            selectedCategory: $viewModel.selectedCategory,
+            onCategoryTapped: { category in
+                // Show subcategory sheet if category has subcategories
+                if let subcategories = category.subCategories?.allObjects as? [SubCategory],
+                   !subcategories.isEmpty {
+                    categoryForSubcategoryPicker = category
+                }
+            }
+        )
+    }
+    
+    private var middleBarView: some View {
+        TransactionMiddleBar(
+            selectedCategory: $viewModel.selectedCategory,
+            selectedSubCategory: $viewModel.selectedSubCategory,
+            selectedAccount: $viewModel.selectedAccount,
+            transactionDate: $viewModel.transactionDate,
+            merchant: $viewModel.merchant,
+            splitItems: $viewModel.splitItems,
+            note: $viewModel.note,
+            selectedType: viewModel.selectedType,
+            onSubCategoryTap: {
+                if let category = viewModel.selectedCategory {
+                    categoryForSubcategoryPicker = category
+                }
+            },
+            onAccountTap: { showingAccountPicker = true },
+            onMerchantTap: { showingMerchantInput = true },
+            onSplitTap: { showingSplitSheet = true },
+            onNoteTap: { showingNoteInput = true }
+        )
     }
 
 }
