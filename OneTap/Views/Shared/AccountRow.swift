@@ -13,15 +13,11 @@ struct AccountRow: View {
     var body: some View {
         HStack(spacing: 16) {
             // Account Icon
-            ZStack {
-                Circle()
-                    .fill(accountColor.opacity(0.15))
-                    .frame(width: 52, height: 52)
-
-                Image(systemName: account.icon ?? "creditcard.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(accountColor)
-            }
+            AccountIconView(
+                iconName: account.icon ?? "creditcard.fill",
+                color: accountColor,
+                size: 24
+            )
 
             // Account Info
             VStack(alignment: .leading, spacing: 5) {
