@@ -47,7 +47,7 @@ struct MainTabView: View {
                 .tag(4)
         }
         .accentColor(AppTheme.accent)
-        .onChange(of: selectedTab) { oldValue, newValue in
+        .onChange(of: selectedTab, initial: false) { oldValue, newValue in
             if newValue == 2 {
                 // If "Add" tab is tapped, show sheet and revert tab
                 showingScanReceipt = true

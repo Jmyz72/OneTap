@@ -82,6 +82,7 @@ private struct TransactionListContent: View {
             }
         }
         .navigationTitle("Transactions")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {

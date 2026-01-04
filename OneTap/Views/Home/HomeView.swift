@@ -258,9 +258,11 @@ private struct AccountMiniCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: account.icon ?? "questionmark.circle")
-                    .font(.system(size: 20))
-                    .foregroundColor(AppTheme.accent)
+                AccountIconView(
+                    iconName: account.icon ?? "questionmark.circle",
+                    color: account.typeEnum.color,
+                    size: 12
+                )
 
                 Spacer()
             }

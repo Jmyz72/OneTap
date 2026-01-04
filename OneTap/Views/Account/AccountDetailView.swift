@@ -136,15 +136,11 @@ struct AccountDetailView: View {
         VStack(spacing: 24) {
             // Icon & Type
             VStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(accountColor.opacity(0.15))
-                        .frame(width: 80, height: 80)
-
-                    Image(systemName: account.icon ?? "creditcard.fill")
-                        .font(.system(size: 36, weight: .semibold))
-                        .foregroundColor(accountColor)
-                }
+                AccountIconView(
+                    iconName: account.icon ?? "creditcard.fill",
+                    color: accountColor,
+                    size: 36
+                )
 
                 Text(account.typeEnum.rawValue)
                     .font(.system(size: 14, weight: .semibold))
@@ -256,12 +252,14 @@ struct AccountDetailView: View {
 
                 Spacer()
 
-                NavigationLink(destination: 
-                    ScrollView { 
+                NavigationLink(destination:
+                    ScrollView {
                         AccountTransactionList(account: account)
-                            .padding() 
+                            .padding()
                     }
                     .background(AppTheme.background.ignoresSafeArea())
+                    .navigationTitle(account.name ?? "Transactions")
+                    .navigationBarTitleDisplayMode(.inline)
                 ) {
                     Text("See All")
                         .font(.system(size: 14, weight: .semibold))
