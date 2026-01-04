@@ -13,7 +13,8 @@ import Combine
 
 @MainActor
 class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
-    @Published var transactions: [Transaction] = []
+    @Published var sectionedTransactions: [String: [Transaction]] = [:]
+    @Published var sections: [String] = []
     @Published var selectedCategoryFilter: Category?
     @Published var selectedSubCategoryFilter: SubCategory?
 
@@ -54,35 +55,53 @@ class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
         // Cancel previous subscription
         dataCancellable?.cancel()
 
+        // Build predicates
+        var predicates: [NSPredicate] = []
+        
+        if let accountID = account.id {
+            predicates.append(NSPredicate(format: "account.id == %@", accountID as CVarArg))
+        } else {
+            predicates.append(NSPredicate(format: "account == %@", account))
+        }
+
+        if let category = category {
+            predicates.append(NSPredicate(format: "category == %@", category))
+        }
+
+        if let subCategory = subCategory {
+            predicates.append(NSPredicate(format: "subCategory == %@", subCategory))
+        }
+
+        let finalPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+
         // Use repository to get a publisher for live updates
-        dataCancellable = transactionRepository.transactionsPublisher(for: account.objectID, from: nil)
+        dataCancellable = transactionRepository.transactionsByDatePublisher(predicate: finalPredicate)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completion in
                 if case .failure(let error) = completion {
                     self?.handleError(error)
                 }
-            } receiveValue: { [weak self] transactions in
-                guard let self = self else { return }
-
-                // Apply filters in memory using objectID comparison for Core Data objects
-                var filtered = transactions
-
-                if let category = category {
-                    filtered = filtered.filter { transaction in
-                        guard let transactionCategory = transaction.category else { return false }
-                        return transactionCategory.objectID == category.objectID
-                    }
-                }
-
-                if let subCategory = subCategory {
-                    filtered = filtered.filter { transaction in
-                        guard let transactionSubCategory = transaction.subCategory else { return false }
-                        return transactionSubCategory.objectID == subCategory.objectID
-                    }
-                }
-
-                self.transactions = filtered
-                self.loadingState = .loaded
+            } receiveValue: { [weak self] groupedTransactions in
+                self?.sectionedTransactions = groupedTransactions
+                self?.sections = groupedTransactions.keys.sorted(by: >)
+                self?.loadingState = .loaded
             }
+    }
+    
+    func calculateSectionTotal(for section: String) -> String {
+        let transactions = sectionedTransactions[section] ?? []
+        let total = transactions.reduce(0.0) { sum, transaction in
+            switch transaction.typeEnum {
+            case .expense:
+                return sum - transaction.amount
+            case .income:
+                return sum + transaction.amount
+            default:
+                return sum
+            }
+        }
+
+        let formatter = Formatters.currencyFormatter(for: SettingsManager.shared.currencyCode)
+        return formatter.string(from: NSNumber(value: total)) ?? "$0.00"
     }
 }

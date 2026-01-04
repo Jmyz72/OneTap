@@ -41,6 +41,7 @@ private struct EditTransactionContent: View {
     @State private var showingNoteInput = false
     @State private var showingMerchantInput = false
     @State private var showingSplitSheet = false
+    @State private var showingRecurringPicker = false
 
     @FocusState private var focusedField: TransactionDetailsInput.Field?
 
@@ -79,6 +80,23 @@ private struct EditTransactionContent: View {
             .alert("Add Merchant", isPresented: $showingMerchantInput) {
                 TextField("Merchant Name", text: $viewModel.merchant)
                 Button("Done") { }
+            }
+            .confirmationDialog("Recurring Frequency", isPresented: $showingRecurringPicker, titleVisibility: .visible) {
+                // Since frequencies is not in EditTransactionViewModel yet, I should check it.
+                // Wait, I should add frequencies to EditTransactionViewModel too if I want to use it.
+                // For now I'll use hardcoded values or add it to VM.
+                ForEach(["Daily", "Weekly", "Monthly", "Yearly"], id: \.self) { freq in
+                    Button(freq) {
+                        viewModel.frequency = freq
+                        viewModel.isRecurring = true
+                    }
+                }
+                if viewModel.isRecurring {
+                    Button("Remove Recurring", role: .destructive) {
+                        viewModel.isRecurring = false
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -182,7 +200,7 @@ private struct EditTransactionContent: View {
                 // Show subcategory sheet if category has subcategories
                 if let subcategories = category.subCategories?.allObjects as? [SubCategory],
                    !subcategories.isEmpty {
-                    categoryForSubcategoryPicker = category
+                        categoryForSubcategoryPicker = category
                 }
             }
         )
@@ -197,6 +215,8 @@ private struct EditTransactionContent: View {
             merchant: $viewModel.merchant,
             splitItems: $viewModel.splitItems,
             note: $viewModel.note,
+            isRecurring: $viewModel.isRecurring,
+            frequency: $viewModel.frequency,
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -206,7 +226,8 @@ private struct EditTransactionContent: View {
             onAccountTap: { showingAccountPicker = true },
             onMerchantTap: { showingMerchantInput = true },
             onSplitTap: { showingSplitSheet = true },
-            onNoteTap: { showingNoteInput = true }
+            onNoteTap: { showingNoteInput = true },
+            onRecurringTap: { showingRecurringPicker = true }
         )
     }
 

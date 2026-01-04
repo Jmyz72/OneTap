@@ -42,6 +42,7 @@ private struct AddTransactionContent: View {
     @State private var showingNoteInput = false
     @State private var showingMerchantInput = false
     @State private var showingSplitSheet = false
+    @State private var showingRecurringPicker = false
 
     @FocusState private var focusedField: TransactionDetailsInput.Field?
 
@@ -83,6 +84,20 @@ private struct AddTransactionContent: View {
             .alert("Add Merchant", isPresented: $showingMerchantInput) {
                 TextField("Merchant Name", text: $viewModel.merchant)
                 Button("Done") { }
+            }
+            .confirmationDialog("Recurring Frequency", isPresented: $showingRecurringPicker, titleVisibility: .visible) {
+                ForEach(viewModel.frequencies, id: \.self) { freq in
+                    Button(freq) {
+                        viewModel.frequency = freq
+                        viewModel.isRecurring = true
+                    }
+                }
+                if viewModel.isRecurring {
+                    Button("Remove Recurring", role: .destructive) {
+                        viewModel.isRecurring = false
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -186,6 +201,8 @@ private struct AddTransactionContent: View {
             merchant: $viewModel.merchant,
             splitItems: $viewModel.splitItems,
             note: $viewModel.note,
+            isRecurring: $viewModel.isRecurring,
+            frequency: $viewModel.frequency,
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -195,7 +212,8 @@ private struct AddTransactionContent: View {
             onAccountTap: { showingAccountPicker = true },
             onMerchantTap: { showingMerchantInput = true },
             onSplitTap: { showingSplitSheet = true },
-            onNoteTap: { showingNoteInput = true }
+            onNoteTap: { showingNoteInput = true },
+            onRecurringTap: { showingRecurringPicker = true }
         )
     }
 

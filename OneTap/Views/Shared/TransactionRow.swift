@@ -88,13 +88,21 @@ struct TransactionRow: View {
                     .gradientForeground(amountGradient)
                     .shadow(color: amountColor.opacity(0.3), radius: 4, x: 0, y: 2)
 
-                Text(Formatters.time.string(from: transaction.date ?? Date()))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textTertiary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(AppTheme.secondaryBackground)
-                    .cornerRadius(8)
+                HStack(spacing: 4) {
+                    if transaction.recurringTransaction != nil {
+                        Image(systemName: "repeat")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppTheme.accent)
+                    }
+
+                    Text(Formatters.time.string(from: transaction.date ?? Date()))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.textTertiary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(AppTheme.secondaryBackground)
+                .cornerRadius(8)
             }
         }
         .padding(.vertical, 14)

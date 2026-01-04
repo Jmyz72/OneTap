@@ -25,6 +25,10 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var merchant: String
     @Published var note: String
     @Published var splitItems: [SplitItemData] = []
+    
+    // Recurring State
+    @Published var isRecurring = false
+    @Published var frequency = "Monthly"
 
     // Data from repositories
     @Published var categories: [Category] = []

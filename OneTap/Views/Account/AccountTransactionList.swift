@@ -17,17 +17,52 @@ struct AccountTransactionList: View {
         Group {
             if let viewModel = viewModel {
                 VStack(spacing: 0) {
-                    ForEach(viewModel.transactions) { transaction in
-                        VStack(spacing: 0) {
-                            NavigationLink(destination: TransactionDetailView(transaction: transaction)) {
-                                TransactionRow(transaction: transaction)
+                    if viewModel.sections.isEmpty {
+                        if viewModel.loadingState.isLoading {
+                            ProgressView()
+                                .padding(30)
+                        } else {
+                            // Empty state or filtered out
+                            Text("No transactions")
+                                .font(.system(size: 14))
+                                .foregroundColor(AppTheme.textSecondary)
+                                .padding(20)
+                        }
+                    } else {
+                        ForEach(viewModel.sections, id: \.self) { sectionKey in
+                            // Section Header
+                            HStack {
+                                Text(sectionKey)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(AppTheme.textSecondary)
+                                    .textCase(.uppercase)
+                                
+                                Spacer()
+                                
+                                Text(viewModel.calculateSectionTotal(for: sectionKey))
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundColor(AppTheme.textTertiary)
                             }
-                            .buttonStyle(.plain)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(AppTheme.secondaryBackground.opacity(0.3))
                             
-                            if transaction != viewModel.transactions.last {
-                                Divider()
-                                    .background(Color.white.opacity(0.05))
-                                    .padding(.leading, 68)
+                            if let transactions = viewModel.sectionedTransactions[sectionKey] {
+                                ForEach(transactions) { transaction in
+                                    VStack(spacing: 0) {
+                                        NavigationLink(destination: TransactionDetailView(transaction: transaction)) {
+                                            TransactionRow(transaction: transaction)
+                                        }
+                                        .buttonStyle(.plain)
+                                        
+                                        // Show divider only if it's not the last item in the section
+                                        if transaction != transactions.last {
+                                            Divider()
+                                                .background(Color.white.opacity(0.05))
+                                                .padding(.leading, 68)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -42,6 +77,7 @@ struct AccountTransactionList: View {
                 ProgressView()
             }
         }
+        .navigationTitle(account.name ?? "Transactions")
         .onAppear {
             if viewModel == nil {
                 viewModel = container.makeAccountTransactionListViewModel(account: account)

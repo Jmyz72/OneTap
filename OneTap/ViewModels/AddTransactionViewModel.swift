@@ -25,6 +25,11 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var merchant = ""
     @Published var note = ""
     @Published var splitItems: [SplitItemData] = []
+    
+    // Recurring State
+    @Published var isRecurring = false
+    @Published var frequency = "Monthly"
+    let frequencies = ["Daily", "Weekly", "Monthly", "Yearly"]
 
     // Data from repositories
     @Published var categories: [Category] = []
@@ -38,6 +43,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     private let transactionRepository: TransactionRepository
     private let accountRepository: AccountRepository
     private let categoryRepository: CategoryRepository
+    private let recurringTransactionRepository: RecurringTransactionRepository
+    private let recurringTransactionService: RecurringTransactionService
     private let transferService: TransferService
     private let balanceService: BalanceService
     private let validationService: ValidationService
@@ -47,6 +54,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         transactionRepository: TransactionRepository,
         accountRepository: AccountRepository,
         categoryRepository: CategoryRepository,
+        recurringTransactionRepository: RecurringTransactionRepository,
+        recurringTransactionService: RecurringTransactionService,
         transferService: TransferService,
         balanceService: BalanceService,
         validationService: ValidationService
@@ -54,6 +63,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         self.transactionRepository = transactionRepository
         self.accountRepository = accountRepository
         self.categoryRepository = categoryRepository
+        self.recurringTransactionRepository = recurringTransactionRepository
+        self.recurringTransactionService = recurringTransactionService
         self.transferService = transferService
         self.balanceService = balanceService
         self.validationService = validationService
@@ -216,27 +227,63 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                     transactionTitle = title
                 }
 
-                let transaction = try transactionRepository.createTransaction(
-                    title: transactionTitle,
-                    amount: totalAmount,
-                    type: selectedType,
-                    date: transactionDate,
-                    account: account,
-                    category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
-                    subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
-                    merchant: merchant.isEmpty ? nil : merchant,
-                    notes: note.isEmpty ? nil : note
-                )
+                if isRecurring {
+                    // Create Recurring Template
+                    let recurring = try recurringTransactionRepository.createRecurring(
+                        amount: totalAmount,
+                        frequency: frequency,
+                        startDate: transactionDate,
+                        type: selectedType,
+                        account: account,
+                        category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
+                        subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
+                        title: transactionTitle.isEmpty ? nil : transactionTitle,
+                        merchant: merchant.isEmpty ? nil : merchant,
+                        notes: note.isEmpty ? nil : note
+                    )
 
-                // Add split items if any
-                if !splitItems.isEmpty {
-                    try transactionRepository.addSplitItems(splitItems, to: transaction)
+                    // Add split items to template if any
+                    if !splitItems.isEmpty {
+                        for item in splitItems {
+                            let recItem = RecurringTransactionItem(context: recurringTransactionRepository.context)
+                            recItem.id = UUID()
+                            recItem.title = item.title
+                            recItem.amount = item.amount
+                            recItem.category = item.category
+                            recItem.subCategory = item.subCategory
+                            recItem.recurringTransaction = recurring
+                        }
+                    }
+
+                    try recurringTransactionRepository.save()
+
+                    // Process recurring transactions to create any due instances
+                    // (This will create the first transaction if startDate <= today)
+                    try await recurringTransactionService.processRecurringTransactions()
+                } else {
+                    // Create one-time transaction
+                    let transaction = try transactionRepository.createTransaction(
+                        title: transactionTitle,
+                        amount: totalAmount,
+                        type: selectedType,
+                        date: transactionDate,
+                        account: account,
+                        category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
+                        subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
+                        merchant: merchant.isEmpty ? nil : merchant,
+                        notes: note.isEmpty ? nil : note
+                    )
+
+                    // Add split items if any
+                    if !splitItems.isEmpty {
+                        try transactionRepository.addSplitItems(splitItems, to: transaction)
+                    }
+
+                    try transactionRepository.save()
+
+                    // Recalculate balance
+                    try await balanceService.recalculateBalances(for: account.objectID, from: transactionDate)
                 }
-
-                try transactionRepository.save()
-
-                // Recalculate balance
-                try await balanceService.recalculateBalances(for: account.objectID, from: transactionDate)
             }
 
             finishLoading()

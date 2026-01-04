@@ -7,14 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		00C8809B2F07E5190076B232 /* 6C2774F3-CD35-4713-B052-2E70E685979A_1_101_o.jpeg in Resources */ = {isa = PBXBuildFile; fileRef = 00C880992F07E5190076B232 /* 6C2774F3-CD35-4713-B052-2E70E685979A_1_101_o.jpeg */; };
-		00C8809C2F07E5190076B232 /* 025C433C-E594-4D55-86DF-412792E8700F_4_5005_c.jpeg in Resources */ = {isa = PBXBuildFile; fileRef = 00C8809A2F07E5190076B232 /* 025C433C-E594-4D55-86DF-412792E8700F_4_5005_c.jpeg */; };
+		00C880C32F0A90560076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-04 at 20.10.38.png in Resources */ = {isa = PBXBuildFile; fileRef = 00C880C22F0A90560076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-04 at 20.10.38.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		003155CB2F0223470060115D /* OneTap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OneTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		00C880992F07E5190076B232 /* 6C2774F3-CD35-4713-B052-2E70E685979A_1_101_o.jpeg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "6C2774F3-CD35-4713-B052-2E70E685979A_1_101_o.jpeg"; sourceTree = "<group>"; };
-		00C8809A2F07E5190076B232 /* 025C433C-E594-4D55-86DF-412792E8700F_4_5005_c.jpeg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "025C433C-E594-4D55-86DF-412792E8700F_4_5005_c.jpeg"; sourceTree = "<group>"; };
+		00C880C22F0A90560076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-04 at 20.10.38.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Simulator Screenshot - iPhone 17 Pro Max - 2026-01-04 at 20.10.38.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -39,8 +37,7 @@
 		003155C22F0223470060115D = {
 			isa = PBXGroup;
 			children = (
-				00C880992F07E5190076B232 /* 6C2774F3-CD35-4713-B052-2E70E685979A_1_101_o.jpeg */,
-				00C8809A2F07E5190076B232 /* 025C433C-E594-4D55-86DF-412792E8700F_4_5005_c.jpeg */,
+				00C880C22F0A90560076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-04 at 20.10.38.png */,
 				003155CD2F0223470060115D /* OneTap */,
 				003155CC2F0223470060115D /* Products */,
 			);
@@ -118,8 +115,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00C8809B2F07E5190076B232 /* 6C2774F3-CD35-4713-B052-2E70E685979A_1_101_o.jpeg in Resources */,
-				00C8809C2F07E5190076B232 /* 025C433C-E594-4D55-86DF-412792E8700F_4_5005_c.jpeg in Resources */,
+				00C880C32F0A90560076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-04 at 20.10.38.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
