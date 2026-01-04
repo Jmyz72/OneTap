@@ -2,7 +2,7 @@
 //  AccountDetailView.swift
 //  OneTap
 //
-//  REFACTORED: Now uses AccountDetailViewModel (MVVM pattern)
+//  REFACTORED: Clean, modern account detail view with MVVM pattern
 //
 
 import SwiftUI
@@ -22,33 +22,24 @@ struct AccountDetailView: View {
     var body: some View {
         Group {
             if let viewModel {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Account Header Card
-                        accountHeaderCard(viewModel: viewModel)
+                ZStack {
+                    AppTheme.background.ignoresSafeArea()
 
-                        // Credit Card Visualization (if available)
-                        if let last4 = account.lastFourDigits, !last4.isEmpty {
-                            creditCardView(last4: last4)
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // Account Header
+                            accountHeaderCard
+
+                            // Quick Actions
+                            quickActionsCard
+
+                            // Transaction History
+                            transactionHistorySection
                         }
-
-                        // Quick Stats
-                        quickStatsCard(viewModel: viewModel)
-
-                        // Transactions Header
-                        HStack {
-                            Text("History")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Spacer()
-                        }
-
-                        // Transaction List
-                        AccountTransactionList(account: account)
+                        .padding(16)
+                        .padding(.top, 8)
                     }
-                    .padding(20)
                 }
-                .background(AppTheme.background.ignoresSafeArea())
                 .navigationTitle(account.name ?? "Account")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -57,22 +48,24 @@ struct AccountDetailView: View {
                             Button {
                                 showingEditSheet = true
                             } label: {
-                                Label("Edit", systemImage: "pencil")
+                                Label("Edit Account", systemImage: "pencil")
                             }
+
+                            Divider()
 
                             Button(role: .destructive) {
                                 showingDeleteAlert = true
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label("Delete Account", systemImage: "trash")
                             }
                         } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.system(size: 20))
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 22))
                                 .foregroundColor(AppTheme.textPrimary)
                         }
                     }
                 }
-                .toolbarBackground(AppTheme.background, for: .navigationBar)
+                .toolbarBackground(AppTheme.backgroundSolid, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .sheet(isPresented: $showingEditSheet) {
                     NavigationStack {
@@ -94,9 +87,8 @@ struct AccountDetailView: View {
                         }
                     }
                 } message: {
-                    Text("Are you sure you want to delete this account? This action cannot be undone.")
+                    Text("Are you sure you want to delete this account? This action cannot be undone and all transactions will be removed.")
                 }
-                // MVVM: Error handling
                 .alert("Error", isPresented: Binding(
                     get: { viewModel.errorMessage != nil },
                     set: { if !$0 { viewModel.errorMessage = nil } }
@@ -109,7 +101,6 @@ struct AccountDetailView: View {
                         Text(error)
                     }
                 }
-                // MVVM: Loading overlay
                 .overlay {
                     if viewModel.loadingState.isLoading {
                         ZStack {
@@ -122,7 +113,6 @@ struct AccountDetailView: View {
                         }
                     }
                 }
-                // MVVM: Auto-dismiss on success (after delete)
                 .onChange(of: viewModel.loadingState) { _, newState in
                     if newState == .loaded {
                         dismiss()
@@ -140,206 +130,151 @@ struct AccountDetailView: View {
         }
     }
 
-    private func accountHeaderCard(viewModel: AccountDetailViewModel) -> some View {
+    // MARK: - Account Header
+
+    private var accountHeaderCard: some View {
         VStack(spacing: 24) {
-            // Icon
-            AccountIconView(
-                iconName: account.icon ?? "creditcard.fill",
-                color: accountColor,
-                size: 36
-            )
-            .shadow(color: accountColor.opacity(0.5), radius: 10)
+            // Icon & Type
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(accountColor.opacity(0.15))
+                        .frame(width: 80, height: 80)
+
+                    Image(systemName: account.icon ?? "creditcard.fill")
+                        .font(.system(size: 36, weight: .semibold))
+                        .foregroundColor(accountColor)
+                }
+
+                Text(account.typeEnum.rawValue)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(AppTheme.secondaryBackground)
+                    .cornerRadius(12)
+            }
 
             // Balance
             VStack(spacing: 8) {
-                Text(account.name ?? "Unknown Account")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(AppTheme.textPrimary)
-
-                Text(account.typeEnum.rawValue)
-                    .font(.system(size: 15, weight: .medium))
+                Text("Current Balance")
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(AppTheme.textSecondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-                    .background(AppTheme.secondaryBackground)
-                    .cornerRadius(20)
 
-                Text(viewModel.formatCurrency(account.balance))
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                Text(viewModel?.formatCurrency(account.balance) ?? "")
+                    .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundColor(balanceColor)
-                    .padding(.top, 12)
 
                 if account.isLiability {
-                    Text("Liability Account")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(AppTheme.expense)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                        .background(AppTheme.expense.opacity(0.1))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.expense.opacity(0.3), lineWidth: 1)
-                        )
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12))
+
+                        Text("Liability Account")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(AppTheme.expense)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(AppTheme.expense.opacity(0.1))
+                    .cornerRadius(10)
+                }
+            }
+
+            // Account Details
+            if account.currency != nil || account.lastFourDigits != nil {
+                Divider()
+                    .padding(.horizontal, 24)
+
+                VStack(spacing: 12) {
+                    if let currency = account.currency {
+                        DetailRow(label: "Currency", value: currency)
+                    }
+
+                    if let last4 = account.lastFourDigits, !last4.isEmpty {
+                        DetailRow(label: "Last 4 Digits", value: "•••• \(last4)")
+                    }
+
+                    if account.billingDay > 0 {
+                        DetailRow(label: "Billing Day", value: "Day \(account.billingDay)")
+                    }
+
+                    if account.dueDay > 0 {
+                        DetailRow(label: "Payment Due", value: "Day \(account.dueDay)")
+                    }
                 }
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .padding(.horizontal, 24)
-        .background(
-            ZStack {
-                AppTheme.cardBackground
-                // Subtle gradient overlay
-                LinearGradient(
-                    colors: [accountColor.opacity(0.1), Color.clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-        )
-        .cornerRadius(32)
+        .padding(28)
+        .background(AppTheme.cardBackground)
+        .cornerRadius(24)
         .overlay(
-            RoundedRectangle(cornerRadius: 32)
+            RoundedRectangle(cornerRadius: 24)
                 .stroke(Color.white.opacity(0.05), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.4), radius: 20, x: 0, y: 10)
+        .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 8)
     }
 
-    private func creditCardView(last4: String) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    // Custom Chip View
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.9, green: 0.8, blue: 0.5), // Gold light
-                                    Color(red: 0.7, green: 0.6, blue: 0.3)  // Gold dark
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 40, height: 30)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(Color.black.opacity(0.2), lineWidth: 1)
-                        )
-                        .overlay(
-                            // Chip lines
-                            HStack(spacing: 0) {
-                                Divider().background(Color.black.opacity(0.2))
-                                Spacer()
-                                Divider().background(Color.black.opacity(0.2))
-                            }
-                            .padding(.horizontal, 10)
-                        )
-                        .overlay(
-                            // Chip lines vertical
-                            VStack(spacing: 0) {
-                                Divider().background(Color.black.opacity(0.2))
-                                Spacer()
-                                Divider().background(Color.black.opacity(0.2))
-                            }
-                            .padding(.vertical, 8)
-                        )
+    // MARK: - Quick Actions
 
-                    Spacer()
+    private var quickActionsCard: some View {
+        HStack(spacing: 12) {
+            QuickActionButton(
+                icon: "plus.circle.fill",
+                title: "Add",
+                color: AppTheme.income
+            ) {
+                // TODO: Add transaction
+            }
 
-                    Image(systemName: "wave.3.right")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white.opacity(0.6))
-                }
+            QuickActionButton(
+                icon: "arrow.left.arrow.right.circle.fill",
+                title: "Transfer",
+                color: AppTheme.accent
+            ) {
+                // TODO: Transfer
+            }
+
+            QuickActionButton(
+                icon: "chart.bar.fill",
+                title: "Stats",
+                color: AppTheme.secondaryAccent
+            ) {
+                // TODO: Show stats
+            }
+        }
+    }
+
+    // MARK: - Transaction History
+
+    private var transactionHistorySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Recent Transactions")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(AppTheme.textPrimary)
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    Text("••••")
-                    Text("••••")
-                    Text("••••")
-                    Text(last4)
-                        .font(.system(size: 20, weight: .bold, design: .monospaced))
-                }
-                .foregroundColor(.white.opacity(0.9))
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("CARD HOLDER")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.6))
-                        Text(account.name?.uppercased() ?? "NAME")
-                            .font(.caption)
-                            .fontWeight(.bold)
+                NavigationLink(destination: 
+                    ScrollView { 
+                        AccountTransactionList(account: account)
+                            .padding() 
                     }
-
-                    Spacer()
-
-                    if account.typeEnum == .creditCard {
-                        // Assuming generic Visa/Mastercard style logo if specific asset not known
-                        // Just text for now or simple circle
-                        Circle()
-                            .fill(Color.white.opacity(0.8))
-                            .frame(width: 20, height: 20)
-                            .overlay(
-                                Circle()
-                                    .fill(Color.white.opacity(0.6))
-                                    .frame(width: 20, height: 20)
-                                    .offset(x: -12)
-                            )
-                    }
+                    .background(AppTheme.background.ignoresSafeArea())
+                ) {
+                    Text("See All")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.accent)
                 }
             }
-        }
-        .padding(24)
-        .frame(height: 200)
-        .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(
-                colors: [accountColor.opacity(0.8), accountColor.opacity(0.4)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(16)
-        .shadow(color: accountColor.opacity(0.3), radius: 10, x: 0, y: 5)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-        )
-    }
+            .padding(.horizontal, 4)
 
-    private func quickStatsCard(viewModel: AccountDetailViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Details")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(AppTheme.textPrimary)
-                .padding(.leading, 4)
-
-            VStack(spacing: 0) {
-                StatRow(title: "Currency", value: account.currency ?? SettingsManager.shared.currencyCode, isLast: false)
-                StatRow(title: "Type", value: account.typeEnum.rawValue, isLast: false)
-
-                if account.typeEnum == .creditCard || account.typeEnum == .bnpl {
-                    if account.billingDay > 0 {
-                        StatRow(title: "Billing Cycle", value: "Day \(account.billingDay)", isLast: false)
-                    }
-                    if account.dueDay > 0 {
-                        StatRow(title: "Payment Due", value: "Day \(account.dueDay)", isLast: false)
-                    }
-                }
-
-                StatRow(title: "Created", value: viewModel.formatDate(account.createdAt), isLast: true)
-            }
-            .background(AppTheme.cardBackground)
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
-            )
+            AccountTransactionList(account: account)
         }
     }
+
+    // MARK: - Helpers
 
     private var accountColor: Color {
         return account.typeEnum.color
@@ -353,31 +288,54 @@ struct AccountDetailView: View {
     }
 }
 
-struct StatRow: View {
-    let title: String
+// MARK: - Detail Row
+
+private struct DetailRow: View {
+    let label: String
     let value: String
-    let isLast: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
+        HStack {
+            Text(label)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppTheme.textSecondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary)
+        }
+    }
+}
+
+// MARK: - Quick Action Button
+
+private struct QuickActionButton: View {
+    let icon: String
+    let title: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(color)
+
                 Text(title)
-                    .font(.system(size: 15))
-                    .foregroundColor(AppTheme.textSecondary)
-
-                Spacer()
-
-                Text(value)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppTheme.textPrimary)
             }
-            .padding(16)
-
-            if !isLast {
-                Divider()
-                    .background(Color.white.opacity(0.05))
-                    .padding(.leading, 16)
-            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(AppTheme.cardBackground)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            )
         }
     }
 }

@@ -9,40 +9,67 @@ import SwiftUI
 internal import CoreData
 
 struct MainTabView: View {
+    @State private var selectedTab = 0
+    @State private var previousTab = 0
+    @State private var showingScanReceipt = false
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             TransactionsTab()
                 .tabItem {
                     Label("Transactions", systemImage: "list.bullet.rectangle.fill")
                 }
-            
+                .tag(0)
+
             AccountsTab()
                 .tabItem {
                     Label("Accounts", systemImage: "building.columns.fill")
                 }
-            
-            OverviewTab()
+                .tag(1)
+
+            // Add Tab (Acts as a button)
+            Color.clear
                 .tabItem {
-                    Label("Overview", systemImage: "chart.pie.fill")
+                    Label("Add", systemImage: "plus.circle.fill")
                 }
-            
-            MoreTab()
+                .tag(2)
+
+            HomeTab()
                 .tabItem {
-                    Label("More", systemImage: "ellipsis.circle")
+                    Label("Home", systemImage: "house.fill")
                 }
+                .tag(3)
+
+            AnalyticsTab()
+                .tabItem {
+                    Label("Analytics", systemImage: "chart.bar.fill")
+                }
+                .tag(4)
         }
         .accentColor(AppTheme.accent)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            if newValue == 2 {
+                // If "Add" tab is tapped, show sheet and revert tab
+                showingScanReceipt = true
+                selectedTab = oldValue
+            } else {
+                // Otherwise update the tracker
+                previousTab = newValue
+            }
+        }
+        .sheet(isPresented: $showingScanReceipt) {
+            ScanReceiptView()
+        }
         .preferredColorScheme(.dark)
         .onAppear {
             setupTabBarAppearance()
         }
     }
-    
+
     private func setupTabBarAppearance() {
         let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(AppTheme.secondaryBackground)
-        
+        appearance.configureWithDefaultBackground()
+
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
@@ -64,221 +91,22 @@ struct AccountsTab: View {
     }
 }
 
-// MARK: - Overview Tab (Placeholder for future analytics)
-struct OverviewTab: View {
+// MARK: - Home Tab
+struct HomeTab: View {
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AppTheme.background.ignoresSafeArea()
-                
-                VStack(spacing: 24) {
-                    Image(systemName: "chart.pie.fill")
-                        .font(.system(size: 70))
-                        .foregroundColor(AppTheme.accent)
-                    
-                    Text("Overview")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    Text("Analytics and insights coming soon")
-                        .font(.system(size: 16))
-                        .foregroundColor(AppTheme.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-            }
-            .navigationTitle("Overview")
-            .toolbarBackground(AppTheme.background, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-        }
+        HomeView()
     }
 }
 
-// MARK: - More Tab (Settings and additional features)
-struct MoreTab: View {
-    @EnvironmentObject private var container: DependencyContainer
-    @State private var viewModel: SettingsViewModel?
-
+// MARK: - Analytics Tab
+struct AnalyticsTab: View {
     var body: some View {
-        NavigationStack {
-            Group {
-                if let viewModel {
-                    MoreTabContent(viewModel: viewModel)
-                } else {
-                    ProgressView()
-                        .onAppear {
-                            if viewModel == nil {
-                                viewModel = container.makeSettingsViewModel()
-                            }
-                        }
-                }
-            }
-            .onAppear {
-                // Initialize ViewModel from injected container
-                if viewModel == nil {
-                    viewModel = container.makeSettingsViewModel()
-                }
-            }
-        }
-    }
-}
-
-private struct MoreTabContent: View {
-    @ObservedObject var viewModel: SettingsViewModel
-    @State private var showingClearDataAlert = false
-
-    var body: some View {
-        ZStack {
-            AppTheme.background.ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Settings Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Settings")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
-                            .padding(.horizontal, 20)
-
-                        VStack(spacing: 0) {
-                            MoreRow(icon: "gear", title: "Preferences", color: .blue)
-                            Divider().padding(.leading, 60)
-                            NavigationLink(destination: CategoryListView()) {
-                                MoreRowContent(icon: "folder.fill", title: "Categories", color: .orange)
-                            }
-                            Divider().padding(.leading, 60)
-                            MoreRow(icon: "bell.fill", title: "Notifications", color: .purple)
-                        }
-                        .background(AppTheme.cardBackground)
-                        .cornerRadius(12)
-                        .padding(.horizontal, 20)
-                    }
-
-                    // Data Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Data")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
-                            .padding(.horizontal, 20)
-
-                        VStack(spacing: 0) {
-                            MoreRow(icon: "square.and.arrow.up", title: "Export Data", color: .green)
-                            Divider().padding(.leading, 60)
-                            MoreRow(icon: "square.and.arrow.down", title: "Import Data", color: .teal)
-                            Divider().padding(.leading, 60)
-                            MoreRow(icon: "arrow.triangle.2.circlepath", title: "Backup & Sync", color: .indigo)
-                            Divider().padding(.leading, 60)
-                            Button {
-                                showingClearDataAlert = true
-                            } label: {
-                                MoreRowContent(icon: "trash.fill", title: "Clear All Data", color: .red)
-                            }
-                        }
-                        .background(AppTheme.cardBackground)
-                        .cornerRadius(12)
-                        .padding(.horizontal, 20)
-                    }
-
-                    // About Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("About")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
-                            .padding(.horizontal, 20)
-
-                        VStack(spacing: 0) {
-                            HStack {
-                                Image(systemName: "info.circle")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(.cyan)
-                                    .frame(width: 36)
-
-                                Text("Version")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(AppTheme.textPrimary)
-
-                                Spacer()
-
-                                Text("1.0.0")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(AppTheme.textSecondary)
-                            }
-                            .padding(16)
-                        }
-                        .background(AppTheme.cardBackground)
-                        .cornerRadius(12)
-                        .padding(.horizontal, 20)
-                    }
-                }
-                .padding(.top, 20)
-                .padding(.bottom, 40)
-            }
-        }
-        .navigationTitle("More")
-        .toolbarBackground(AppTheme.background, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .alert("Clear All Data", isPresented: $showingClearDataAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                Task {
-                    await viewModel.clearAllData()
-                }
-            }
-        } message: {
-            Text("This will permanently delete all your accounts, transactions, and custom categories. This action cannot be undone.")
-        }
-        .overlay {
-            if viewModel.loadingState.isLoading {
-                ZStack {
-                    Color.black.opacity(0.4).ignoresSafeArea()
-                    ProgressView().scaleEffect(1.5).tint(.white)
-                }
-            }
-        }
-    }
-}
-
-struct MoreRow: View {
-    let icon: String
-    let title: String
-    let color: Color
-    
-    var body: some View {
-        Button {
-            // Action will be added later
-        } label: {
-            MoreRowContent(icon: icon, title: title, color: color)
-        }
-    }
-}
-
-struct MoreRowContent: View {
-    let icon: String
-    let title: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 22))
-                .foregroundColor(color)
-                .frame(width: 36)
-            
-            Text(title)
-                .font(.system(size: 16))
-                .foregroundColor(AppTheme.textPrimary)
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(AppTheme.textTertiary)
-        }
-        .padding(16)
+        AnalyticsView()
     }
 }
 
 #Preview {
     MainTabView()
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+        .environmentObject(DependencyContainer(persistenceController: .preview))
 }

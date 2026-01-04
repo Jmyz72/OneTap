@@ -22,11 +22,13 @@ final class DependencyContainer: ObservableObject {
     let transactionRepository: TransactionRepository
     let accountRepository: AccountRepository
     let categoryRepository: CategoryRepository
+    let recurringTransactionRepository: RecurringTransactionRepository
 
     // MARK: - Services
     let balanceService: BalanceService
     let transferService: TransferService
     let validationService: ValidationService
+    let recurringTransactionService: RecurringTransactionService
 
     init(persistenceController: PersistenceController? = nil) {
         let pc = persistenceController ?? PersistenceController.shared
@@ -37,6 +39,7 @@ final class DependencyContainer: ObservableObject {
         self.transactionRepository = TransactionRepository(context: context)
         self.accountRepository = AccountRepository(context: context)
         self.categoryRepository = CategoryRepository(context: context)
+        self.recurringTransactionRepository = RecurringTransactionRepository(context: context)
 
         // Initialize services
         self.balanceService = BalanceService(container: pc.container)
@@ -45,6 +48,11 @@ final class DependencyContainer: ObservableObject {
             balanceService: balanceService
         )
         self.validationService = ValidationService()
+        self.recurringTransactionService = RecurringTransactionService(
+            context: context,
+            transactionRepository: transactionRepository,
+            balanceService: balanceService
+        )
     }
 
     // MARK: - ViewModel Factories
@@ -54,6 +62,8 @@ final class DependencyContainer: ObservableObject {
             transactionRepository: transactionRepository,
             accountRepository: accountRepository,
             categoryRepository: categoryRepository,
+            recurringTransactionRepository: recurringTransactionRepository,
+            recurringTransactionService: recurringTransactionService,
             transferService: transferService,
             balanceService: balanceService,
             validationService: validationService
@@ -125,5 +135,29 @@ final class DependencyContainer: ObservableObject {
     
     func makeSettingsViewModel() -> SettingsViewModel {
         SettingsViewModel(persistenceController: persistenceController)
+    }
+    
+    func makeRecurringTransactionsListViewModel() -> RecurringTransactionsListViewModel {
+        RecurringTransactionsListViewModel(repository: recurringTransactionRepository)
+    }
+
+    func makeAddRecurringTransactionViewModel() -> AddRecurringTransactionViewModel {
+        AddRecurringTransactionViewModel(
+            recurringTransactionRepository: recurringTransactionRepository,
+            accountRepository: accountRepository,
+            categoryRepository: categoryRepository,
+            recurringTransactionService: recurringTransactionService,
+            validationService: validationService
+        )
+    }
+
+    func makeEditRecurringTransactionViewModel(recurring: RecurringTransaction) -> EditRecurringTransactionViewModel {
+        EditRecurringTransactionViewModel(
+            recurring: recurring,
+            recurringTransactionRepository: recurringTransactionRepository,
+            accountRepository: accountRepository,
+            categoryRepository: categoryRepository,
+            validationService: validationService
+        )
     }
 }

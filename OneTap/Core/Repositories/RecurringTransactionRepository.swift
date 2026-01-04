@@ -1,0 +1,102 @@
+//
+//  RecurringTransactionRepository.swift
+//  OneTap
+//
+
+import Foundation
+internal import CoreData
+import Combine
+
+class RecurringTransactionRepository: BaseRepository {
+    typealias Entity = RecurringTransaction
+
+    let context: NSManagedObjectContext
+    private var cancellables = Set<AnyCancellable>()
+
+    init(context: NSManagedObjectContext) {
+        self.context = context
+    }
+
+    // MARK: - Publishers
+
+    func recurringTransactionsPublisher() -> AnyPublisher<[RecurringTransaction], Error> {
+        let request: NSFetchRequest<RecurringTransaction> = RecurringTransaction.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \RecurringTransaction.startDate, ascending: false)]
+        
+        let initial = (try? context.fetch(request)) ?? []
+        let subject = CurrentValueSubject<[RecurringTransaction], Error>(initial)
+        
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                let updated = (try? self.context.fetch(request)) ?? []
+                subject.send(updated)
+            }
+            .store(in: &cancellables)
+            
+        return subject.eraseToAnyPublisher()
+    }
+
+    // MARK: - CRUD Operations
+
+    func createRecurring(
+        amount: Double,
+        frequency: String,
+        startDate: Date,
+        type: TransactionType,
+        account: Account,
+        category: Category?,
+        subCategory: SubCategory?,
+        title: String?,
+        merchant: String?,
+        notes: String?,
+        toAccount: Account? = nil,
+        occurrenceLimit: Int? = nil,
+        endDate: Date? = nil,
+        interval: Int = 1,
+        weeklyDays: String? = nil,
+        monthlyDay: Int? = nil
+    ) throws -> RecurringTransaction {
+        let recurring = RecurringTransaction(context: context)
+        recurring.id = UUID()
+        recurring.amount = amount
+        recurring.frequency = frequency
+        recurring.startDate = startDate
+        recurring.nextRunDate = startDate
+        recurring.type = type.rawValue
+        recurring.account = account
+        recurring.category = category
+        recurring.subCategory = subCategory
+        recurring.title = title
+        recurring.merchant = merchant
+        recurring.notes = notes
+        recurring.toAccount = toAccount
+        recurring.isActive = true
+        recurring.createdAt = Date()
+        recurring.updatedAt = Date()
+        recurring.interval = Int16(interval)
+        recurring.endDate = endDate
+        recurring.weeklyDays = weeklyDays
+
+        if let limit = occurrenceLimit {
+            recurring.occurrenceLimit = Int16(limit)
+        }
+
+        if let day = monthlyDay {
+            recurring.monthlyDay = Int16(day)
+        }
+
+        return recurring
+    }
+
+    func save() throws {
+        if context.hasChanges {
+            try context.save()
+        }
+    }
+
+    func delete(_ recurring: RecurringTransaction) throws {
+        context.delete(recurring)
+        try save()
+    }
+}

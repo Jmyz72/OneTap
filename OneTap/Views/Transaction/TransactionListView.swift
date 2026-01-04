@@ -137,6 +137,8 @@ private struct TransactionListContent: View {
                             .font(.system(size: 20))
                             .foregroundColor(AppTheme.accent)
                     }
+
+                    ProfileButton()
                 }
             }
         }

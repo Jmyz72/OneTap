@@ -216,7 +216,7 @@ struct TransactionDetailView: View {
     }
 }
 
-struct DetailRow: View {
+private struct DetailRow: View {
     let label: String
     let value: String
     let icon: String

@@ -14,6 +14,10 @@ struct TransactionMiddleBar: View {
     @Binding var merchant: String
     @Binding var splitItems: [SplitItemData]
     @Binding var note: String
+    
+    @Binding var isRecurring: Bool
+    @Binding var frequency: String
+    
     let selectedType: TransactionType
     
     // Actions
@@ -22,6 +26,7 @@ struct TransactionMiddleBar: View {
     let onMerchantTap: () -> Void
     let onSplitTap: () -> Void
     let onNoteTap: () -> Void
+    let onRecurringTap: () -> Void
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -44,6 +49,15 @@ struct TransactionMiddleBar: View {
                             isActive: !merchant.isEmpty
                         )
                     }
+                }
+
+                // Recurring Chip
+                Button(action: onRecurringTap) {
+                    chipView(
+                        icon: "repeat",
+                        text: isRecurring ? frequency : "Make Recurring",
+                        isActive: isRecurring
+                    )
                 }
 
                 // Split Chip (Expense only)

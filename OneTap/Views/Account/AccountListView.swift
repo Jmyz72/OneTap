@@ -2,7 +2,7 @@
 //  AccountListView.swift
 //  OneTap
 //
-//  REFACTORED: Now uses AccountListViewModel (MVVM pattern)
+//  REFACTORED: Clean, modern design with MVVM pattern
 //
 
 import SwiftUI
@@ -42,88 +42,44 @@ private struct AccountListContent: View {
     @State private var accountToEdit: Account?
 
     var body: some View {
-        List {
-            // Net Worth Card (Header)
-            Section {
-                netWorthCard(viewModel: viewModel)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .padding(.bottom, 10)
-            }
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
 
-            // Accounts Sections
-            if viewModel.accounts.isEmpty {
-                Section {
-                    emptyStateView
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-            } else {
-                ForEach(AccountGroup.allCases) { group in
-                    let groupAccounts = viewModel.groupedAccounts[group] ?? []
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Net Worth Overview
+                    netWorthCard
 
-                    if !groupAccounts.isEmpty {
-                        Section(header:
-                            Text(group.rawValue)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppTheme.textSecondary)
-                                .textCase(.uppercase)
-                                .padding(.leading, 4)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 0))
-                        ) {
-                            ForEach(groupAccounts) { account in
-                                ZStack {
-                                    NavigationLink(destination: AccountDetailView(account: account)) {
-                                        EmptyView()
-                                    }
-                                    .opacity(0)
-
-                                    AccountRow(account: account)
-                                        .drawingGroup()
-                                }
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 12, trailing: 20))
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        Task {
-                                            await viewModel.deleteAccount(account)
-                                        }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-
-                                    Button {
-                                        accountToEdit = account
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    .tint(.blue)
-                                }
-                            }
-                        }
+                    // Accounts List
+                    if viewModel.accounts.isEmpty {
+                        emptyStateView
+                            .padding(.top, 40)
+                    } else {
+                        accountsSection
                     }
                 }
+                .padding(.vertical, 20)
+                .padding(.horizontal, 16)
             }
         }
-        .listStyle(.plain)
-        .background(AppTheme.background.ignoresSafeArea())
-        .scrollContentBackground(.hidden)
         .navigationTitle("Accounts")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingAddAccount = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(AppTheme.accent)
+                HStack(spacing: 12) {
+                    Button {
+                        showingAddAccount = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(AppTheme.accent)
+                    }
+
+                    ProfileButton()
                 }
             }
         }
-        .toolbarBackground(AppTheme.background, for: .navigationBar)
+        .toolbarBackground(AppTheme.backgroundSolid, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingAddAccount) {
             AddAccountView(isPresented: $showingAddAccount)
@@ -167,97 +123,192 @@ private struct AccountListContent: View {
         .preferredColorScheme(.dark)
     }
 
-    private func netWorthCard(viewModel: AccountListViewModel) -> some View {
-        VStack(spacing: 16) {
+    // MARK: - Net Worth Card
+
+    private var netWorthCard: some View {
+        VStack(spacing: 20) {
             // Net Worth
             VStack(spacing: 8) {
                 Text("Net Worth")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(AppTheme.textSecondary)
 
                 Text(viewModel.formatCurrency(viewModel.netWorth))
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundColor(AppTheme.textPrimary)
+                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .gradientForeground(
+                        LinearGradient(
+                            colors: [AppTheme.accent, AppTheme.accent.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
             }
 
-            Divider()
-                .background(Color.white.opacity(0.1))
-
             // Assets & Liabilities
-            HStack(spacing: 40) {
-                VStack(spacing: 6) {
-                    Text("Assets")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(AppTheme.textSecondary)
+            HStack(spacing: 16) {
+                FinancialStatCard(
+                    title: "Assets",
+                    amount: viewModel.formatCurrency(viewModel.totalAssets),
+                    color: AppTheme.income,
+                    icon: "arrow.up.circle.fill"
+                )
 
-                    Text(viewModel.formatCurrency(viewModel.totalAssets))
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppTheme.income)
-                }
+                FinancialStatCard(
+                    title: "Liabilities",
+                    amount: viewModel.formatCurrency(viewModel.totalLiabilities),
+                    color: AppTheme.expense,
+                    icon: "arrow.down.circle.fill"
+                )
+            }
+        }
+        .padding(28)
+        .background(
+            ZStack {
+                AppTheme.cardBackground
 
-                VStack(spacing: 6) {
-                    Text("Liabilities")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(AppTheme.textSecondary)
+                // Subtle glow
+                LinearGradient(
+                    colors: [
+                        AppTheme.accent.opacity(0.08),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        )
+        .cornerRadius(24)
+        .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 8)
+    }
 
-                    Text(viewModel.formatCurrency(viewModel.totalLiabilities))
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppTheme.expense)
+    // MARK: - Accounts Section
+
+    private var accountsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(AccountGroup.allCases) { group in
+                if let groupAccounts = viewModel.groupedAccounts[group], !groupAccounts.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Group Header
+                        HStack {
+                            Text(group.rawValue)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(AppTheme.textSecondary)
+                                .textCase(.uppercase)
+
+                            Spacer()
+
+                            Text("\(groupAccounts.count)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(AppTheme.textTertiary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(AppTheme.secondaryBackground)
+                                .cornerRadius(6)
+                        }
+                        .padding(.horizontal, 4)
+
+                        // Group Accounts
+                        ForEach(groupAccounts) { account in
+                            NavigationLink(destination: AccountDetailView(account: account)) {
+                                AccountRow(account: account)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    accountToEdit = account
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+
+                                Button(role: .destructive) {
+                                    Task {
+                                        await viewModel.deleteAccount(account)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-        .padding(24)
-        .background(
-            LinearGradient(
-                colors: [
-                    AppTheme.cardBackground,
-                    AppTheme.secondaryBackground
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.3), radius: 10, x: 0, y: 5)
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
     }
 
+    // MARK: - Empty State
+
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "building.columns")
-                .font(.system(size: 60))
-                .foregroundColor(AppTheme.textTertiary)
+        VStack(spacing: 24) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(AppTheme.secondaryBackground)
+                    .frame(width: 100, height: 100)
 
-            Text("No Accounts Yet")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(AppTheme.textPrimary)
+                Image(systemName: "building.columns")
+                    .font(.system(size: 44))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
 
-            Text("Add your first account to start tracking your finances")
-                .font(.system(size: 15))
-                .foregroundColor(AppTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+            VStack(spacing: 12) {
+                Text("No Accounts Yet")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(AppTheme.textPrimary)
+
+                Text("Add your first account to start tracking your finances")
+                    .font(.system(size: 15))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
 
             Button {
                 showingAddAccount = true
             } label: {
-                Text("Add Account")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 14)
-                    .background(AppTheme.accent)
-                    .cornerRadius(12)
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Add Account")
+                }
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.black)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+                .background(AppTheme.accent)
+                .cornerRadius(14)
             }
-            .padding(.top, 10)
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
+    }
+}
+
+// MARK: - Financial Stat Card
+
+private struct FinancialStatCard: View {
+    let title: String
+    let amount: String
+    let color: Color
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(color)
+
+            Text(amount)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(AppTheme.textPrimary)
+
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(AppTheme.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(AppTheme.secondaryBackground)
+        .cornerRadius(16)
     }
 }
 
