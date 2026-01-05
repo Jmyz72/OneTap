@@ -36,6 +36,7 @@ private struct AddRecurringTransactionContent: View {
     @State private var showingExecutionNumberInput = false
     @State private var showingAccountPicker = false
     @State private var categoryForSubcategoryPicker: Category?
+    @State private var showingSplitSheet = false
 
     var body: some View {
         NavigationStack {
@@ -55,6 +56,11 @@ private struct AddRecurringTransactionContent: View {
 
                         // Optional Details
                         optionalDetailsSection
+
+                        // Split Items Section
+                        if viewModel.selectedType == .expense {
+                            splitItemsSection
+                        }
 
                         // EXECUTION SECTION
                         executionSection
@@ -101,6 +107,13 @@ private struct AddRecurringTransactionContent: View {
                 SubCategoryPickerSheet(
                     category: category,
                     selectedSubCategory: $viewModel.selectedSubCategory
+                )
+            }
+            .sheet(isPresented: $showingSplitSheet) {
+                SplitTransactionSheet(
+                    items: $viewModel.splitItems,
+                    currencyCode: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode,
+                    categories: viewModel.categories
                 )
             }
             .alert("Error", isPresented: Binding(
@@ -459,6 +472,74 @@ private struct AddRecurringTransactionContent: View {
                 .padding()
                 .background(AppTheme.cardBackground)
                 .cornerRadius(12)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var splitItemsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Split Items")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .textCase(.uppercase)
+
+                Spacer()
+
+                Button {
+                    showingSplitSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Manage")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.accent)
+                }
+            }
+
+            if !viewModel.splitItems.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(Array(viewModel.splitItems.enumerated()), id: \.offset) { index, item in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.title)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(AppTheme.textPrimary)
+
+                                Text(item.category?.name ?? "")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Text(Formatters.currencyFormatter(for: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode).string(from: NSNumber(value: item.amount)) ?? "")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(AppTheme.expense)
+                        }
+                        .padding()
+                        .background(AppTheme.cardBackground)
+                        .cornerRadius(12)
+                    }
+
+                    // Total
+                    HStack {
+                        Text("Total")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(AppTheme.textPrimary)
+
+                        Spacer()
+
+                        Text(Formatters.currencyFormatter(for: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode).string(from: NSNumber(value: viewModel.totalAmount)) ?? "")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.accent)
+                    }
+                    .padding()
+                    .background(AppTheme.secondaryBackground)
+                    .cornerRadius(12)
+                }
+            }
         }
         .padding(.horizontal, 20)
     }

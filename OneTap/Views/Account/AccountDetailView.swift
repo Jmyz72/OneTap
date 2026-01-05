@@ -12,7 +12,7 @@ struct AccountDetailView: View {
     @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) var dismiss
 
-    let account: Account
+    @ObservedObject var account: Account
     @State private var viewModel: AccountDetailViewModel?
 
     // UI State (view-only state)
@@ -113,8 +113,8 @@ struct AccountDetailView: View {
                         }
                     }
                 }
-                .onChange(of: viewModel.loadingState) { _, newState in
-                    if newState == .loaded {
+                .onChange(of: viewModel.shouldDismiss) { _, shouldDismiss in
+                    if shouldDismiss {
                         dismiss()
                     }
                 }

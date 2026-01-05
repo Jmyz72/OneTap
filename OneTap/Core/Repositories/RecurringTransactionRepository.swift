@@ -99,4 +99,26 @@ class RecurringTransactionRepository: BaseRepository {
         context.delete(recurring)
         try save()
     }
+
+    // MARK: - Split Items Management
+
+    func addSplitItems(_ items: [SplitItemData], to recurring: RecurringTransaction) throws {
+        for item in items {
+            let recurringItem = RecurringTransactionItem(context: context)
+            recurringItem.id = UUID()
+            recurringItem.title = item.title
+            recurringItem.amount = item.amount
+            recurringItem.category = item.category
+            recurringItem.subCategory = item.subCategory
+            recurringItem.recurringTransaction = recurring
+        }
+    }
+
+    func clearSplitItems(for recurring: RecurringTransaction) throws {
+        if let items = recurring.items as? Set<RecurringTransactionItem> {
+            for item in items {
+                context.delete(item)
+            }
+        }
+    }
 }

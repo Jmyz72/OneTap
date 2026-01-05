@@ -20,6 +20,7 @@ class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
+    @Published var debugInfo: String = "Init..."
 
     private let account: Account
     private let transactionRepository: TransactionRepository
@@ -29,6 +30,9 @@ class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
     init(account: Account, transactionRepository: TransactionRepository) {
         self.account = account
         self.transactionRepository = transactionRepository
+        
+        // Setup subscriptions. CombineLatest will fire once immediately upon subscription
+        // with the initial nil values, which will trigger the first fetch.
         setupSubscriptions()
     }
 
@@ -37,6 +41,7 @@ class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
             $selectedCategoryFilter,
             $selectedSubCategoryFilter
         )
+        // Ensure we don't block the init by performing any work here
         .sink { [weak self] category, subCategory in
             self?.fetchTransactions(
                 category: category,
@@ -50,19 +55,17 @@ class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
         category: Category?,
         subCategory: SubCategory?
     ) {
+        // Use MainActor.run to ensure we are on the main thread without the delay of DispatchQueue.main
+        // since this class is already @MainActor.
         loadingState = .loading
+        debugInfo += "\nFetch called"
 
         // Cancel previous subscription
         dataCancellable?.cancel()
 
         // Build predicates
         var predicates: [NSPredicate] = []
-        
-        if let accountID = account.id {
-            predicates.append(NSPredicate(format: "account.id == %@", accountID as CVarArg))
-        } else {
-            predicates.append(NSPredicate(format: "account == %@", account))
-        }
+        predicates.append(NSPredicate(format: "account == %@", account))
 
         if let category = category {
             predicates.append(NSPredicate(format: "category == %@", category))
@@ -75,16 +78,23 @@ class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
         let finalPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 
         // Use repository to get a publisher for live updates
+        // REMOVED .receive(on: DispatchQueue.main) to ensure synchronous emission of initial value
         dataCancellable = transactionRepository.transactionsByDatePublisher(predicate: finalPredicate)
-            .receive(on: DispatchQueue.main)
+            .handleEvents(receiveOutput: { [weak self] _ in
+                self?.debugInfo += "\nOutput received"
+            })
             .sink { [weak self] completion in
                 if case .failure(let error) = completion {
+                    self?.debugInfo += "\nError: \(error.localizedDescription)"
                     self?.handleError(error)
+                    self?.loadingState = .loaded
                 }
             } receiveValue: { [weak self] groupedTransactions in
-                self?.sectionedTransactions = groupedTransactions
-                self?.sections = groupedTransactions.keys.sorted(by: >)
-                self?.loadingState = .loaded
+                guard let self = self else { return }
+                self.debugInfo += "\nSuccess: \(groupedTransactions.count) items"
+                self.sectionedTransactions = groupedTransactions
+                self.sections = groupedTransactions.keys.sorted(by: >)
+                self.loadingState = .loaded
             }
     }
     
