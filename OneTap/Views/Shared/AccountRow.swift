@@ -65,9 +65,7 @@ struct AccountRow: View {
     }
 
     private var formattedBalance: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = account.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: account.currency ?? SettingsManager.shared.currencyCode)
         return formatter.string(from: NSNumber(value: account.balance)) ?? "$0.00"
     }
 

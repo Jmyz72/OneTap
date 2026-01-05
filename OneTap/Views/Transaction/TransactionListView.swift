@@ -36,115 +36,105 @@ struct TransactionListView: View {
 private struct TransactionListContent: View {
     @ObservedObject var viewModel: TransactionListViewModel
     @State private var showingAddTransaction = false
-
-    // Keep @FetchRequest only for category picker UI
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Category.name, ascending: true)],
-        animation: .default
-    ) private var categories: FetchedResults<Category>
+    @State private var showingMonthPicker = false
 
     var body: some View {
         ZStack {
             AppTheme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Filter Status Bar
-                if viewModel.selectedCategoryFilter != nil || viewModel.selectedSubCategoryFilter != nil || viewModel.selectedDateFilter != .all {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack {
-                            if viewModel.selectedDateFilter != .all {
-                                FilterChip(text: viewModel.selectedDateFilter.rawValue, icon: "calendar") {
-                                    viewModel.selectedDateFilter = .all
-                                }
-                            }
-                            if let category = viewModel.selectedCategoryFilter {
-                                FilterChip(text: category.name ?? "Category", icon: category.iconName) {
-                                    viewModel.selectedCategoryFilter = nil
-                                    viewModel.selectedSubCategoryFilter = nil
-                                }
-                            }
-                            if let subCategory = viewModel.selectedSubCategoryFilter {
-                                FilterChip(text: subCategory.name ?? "Subcategory", icon: subCategory.displayIcon) {
-                                    viewModel.selectedSubCategoryFilter = nil
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
+                // Month Selector Bar
+                HStack {
+                    Button(action: {
+                        viewModel.goToPreviousMonth()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                            .frame(width: 32, height: 32)
+                            .background(AppTheme.secondaryBackground)
+                            .cornerRadius(8)
                     }
-                    .background(AppTheme.secondaryBackground)
+
+                    Spacer()
+
+                    Button(action: {
+                        showingMonthPicker = true
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text(viewModel.selectedMonthFormatted)
+                                .font(.system(size: 16, weight: .bold))
+                        }
+                        .foregroundColor(AppTheme.textPrimary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(AppTheme.secondaryBackground)
+                        .cornerRadius(10)
+                    }
+
+                    Spacer()
+
+                    Button(action: {
+                        viewModel.goToNextMonth()
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
+                            .frame(width: 32, height: 32)
+                            .background(AppTheme.secondaryBackground)
+                            .cornerRadius(8)
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(AppTheme.background)
 
                 FilteredTransactionList(
                     viewModel: viewModel,
                     onAddTap: { showingAddTransaction = true }
                 )
             }
+
+            // Floating Action Button - Bottom Right
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: { showingAddTransaction = true }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundColor(.black)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                LinearGradient(
+                                    colors: [AppTheme.accent, AppTheme.accent.opacity(0.8)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(Circle())
+                            .shadow(color: AppTheme.accent.opacity(0.4), radius: 12, x: 0, y: 6)
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
+                }
+            }
         }
         .navigationTitle("Transactions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack {
-                    Menu {
-                        Picker("Date Range", selection: Binding(
-                            get: { viewModel.selectedDateFilter },
-                            set: { viewModel.selectedDateFilter = $0 }
-                        )) {
-                            ForEach(DateFilter.allCases) { filter in
-                                Text(filter.rawValue).tag(filter)
-                            }
-                        }
-
-                        Divider()
-
-                        if !categories.isEmpty {
-                            Menu("Category") {
-                                Button("All Categories") {
-                                    viewModel.selectedCategoryFilter = nil
-                                    viewModel.selectedSubCategoryFilter = nil
-                                }
-                                ForEach(categories) { category in
-                                    Button(category.name ?? "Unknown") {
-                                        viewModel.selectedCategoryFilter = category
-                                        viewModel.selectedSubCategoryFilter = nil
-                                    }
-                                }
-                            }
-                        }
-
-                        if let category = viewModel.selectedCategoryFilter,
-                           let subcategories = category.subCategories?.allObjects as? [SubCategory],
-                           !subcategories.isEmpty {
-                            Menu("Subcategory") {
-                                Button("All Subcategories") {
-                                    viewModel.selectedSubCategoryFilter = nil
-                                }
-                                ForEach(subcategories.sorted { $0.order < $1.order }) { subCategory in
-                                    Button(subCategory.name ?? "Unknown") {
-                                        viewModel.selectedSubCategoryFilter = subCategory
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .font(.system(size: 20))
-                            .foregroundColor((viewModel.selectedDateFilter != .all || viewModel.selectedCategoryFilter != nil || viewModel.selectedSubCategoryFilter != nil) ? AppTheme.accent : AppTheme.textPrimary)
-                    }
-
-                    Button(action: { showingAddTransaction = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(AppTheme.accent)
-                    }
-
-                    ProfileButton()
-                }
+                ProfileButton()
             }
         }
         .sheet(isPresented: $showingAddTransaction) {
             AddTransactionView()
+        }
+        .sheet(isPresented: $showingMonthPicker) {
+            MonthPickerSheet(selectedMonth: $viewModel.selectedMonth)
+                .presentationDetents([.medium])
         }
         .searchable(text: Binding(
             get: { viewModel.searchText },
@@ -180,7 +170,7 @@ struct FilteredTransactionList: View {
                         if let transactions = viewModel.sectionedTransactions[sectionKey] {
                             dateHeader(for: sectionKey, transactions: transactions)
 
-                            ForEach(transactions) { transaction in
+                            ForEach(transactions, id: \.objectID) { transaction in
                                 NavigationLink(destination: TransactionDetailView(transaction: transaction)) {
                                     TransactionRow(transaction: transaction)
                                 }
@@ -191,7 +181,7 @@ struct FilteredTransactionList: View {
                         }
                     }
                 }
-                .padding(.bottom, 20)
+                .padding(.bottom, 90)
             }
         }
     }
@@ -228,7 +218,7 @@ struct FilteredTransactionList: View {
 
             Spacer()
 
-            Text(calculateTotal(for: transactions))
+            Text(viewModel.calculateSectionTotal(for: sectionKey))
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(AppTheme.textTertiary)
         }
@@ -236,59 +226,40 @@ struct FilteredTransactionList: View {
         .padding(.vertical, 8)
         .background(AppTheme.background)
     }
-
-    private func calculateTotal(for transactions: [Transaction]) -> String {
-        let total = transactions.reduce(0.0) { sum, t in
-            if t.typeEnum == .expense {
-                return sum - t.amount
-            } else if t.typeEnum == .income {
-                return sum + t.amount
-            }
-            return sum
-        }
-
-        let formatter = Formatters.currencyFormatter(for: SettingsManager.shared.currencyCode)
-        return formatter.string(from: NSNumber(value: total)) ?? "$0.00"
-    }
 }
 
-struct FilterChip: View {
-    let text: String
-    let icon: String
-    let action: () -> Void
+// MARK: - Month Picker Sheet
+
+struct MonthPickerSheet: View {
+    @Binding var selectedMonth: Date
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
+        NavigationStack {
+            VStack(spacing: 0) {
+                DatePicker(
+                    "Select Month",
+                    selection: $selectedMonth,
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.graphical)
+                .padding()
 
-                Text(text)
-                    .font(.system(size: 13, weight: .medium))
-
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .padding(4)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Circle())
+                Spacer()
             }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 10)
-            .background(AppTheme.accent)
-            .foregroundColor(.black)
-            .cornerRadius(20)
+            .background(AppTheme.background)
+            .navigationTitle("Select Month")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(AppTheme.accent)
+                }
+            }
         }
     }
-}
-
-// DateFilter enum moved to shared location or ViewModel
-enum DateFilter: String, CaseIterable, Identifiable {
-    case all = "All Time"
-    case thisMonth = "This Month"
-    case lastMonth = "Last Month"
-    case thisYear = "This Year"
-
-    var id: String { rawValue }
 }
 
 #Preview {

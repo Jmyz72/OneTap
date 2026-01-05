@@ -83,7 +83,7 @@ struct CategoryFormView: View {
                         }
 
                         Section {
-                            ForEach(viewModel.subCategories) { sub in
+                            ForEach(viewModel.subCategories, id: \.objectID) { sub in
                                 Button {
                                     startEditingSub(sub, viewModel: viewModel)
                                 } label: {

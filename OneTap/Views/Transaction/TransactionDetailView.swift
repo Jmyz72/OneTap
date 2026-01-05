@@ -78,7 +78,7 @@ struct TransactionDetailView: View {
                                         .padding(.horizontal)
 
                                     VStack(spacing: 0) {
-                                        ForEach(transaction.itemsArray) { item in
+                                        ForEach(transaction.itemsArray, id: \.objectID) { item in
                                             HStack {
                                                 Image(systemName: item.category?.iconName ?? "tag.fill")
                                                     .foregroundColor(item.category?.colorView ?? AppTheme.accent)
