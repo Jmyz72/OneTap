@@ -28,7 +28,7 @@ struct CategoryListView: View {
                                 .foregroundColor(AppTheme.textSecondary)
                                 .font(.caption)
                         }
-                        ForEach(viewModel.expenseCategories) { category in
+                        ForEach(viewModel.expenseCategories, id: \.objectID) { category in
                             categoryRow(category)
                         }
                         .onMove { source, destination in
@@ -49,7 +49,7 @@ struct CategoryListView: View {
                                 .foregroundColor(AppTheme.textSecondary)
                                 .font(.caption)
                         }
-                        ForEach(viewModel.incomeCategories) { category in
+                        ForEach(viewModel.incomeCategories, id: \.objectID) { category in
                             categoryRow(category)
                         }
                         .onMove { source, destination in
@@ -213,7 +213,7 @@ struct CategoryListView: View {
             // Subcategories Dropdown
             if isExpanded && hasSubcategories {
                 VStack(spacing: 0) {
-                    ForEach(subcategories) { subCategory in
+                    ForEach(subcategories, id: \.objectID) { subCategory in
                         subcategoryRow(subCategory, parentCategory: category)
                     }
 

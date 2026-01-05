@@ -41,7 +41,7 @@ private struct RecurringTransactionsContent: View {
                 )
             } else {
                 List {
-                    ForEach(viewModel.recurringTransactions) { recurring in
+                    ForEach(viewModel.recurringTransactions, id: \.objectID) { recurring in
                         NavigationLink {
                             EditRecurringTransactionView(recurring: recurring)
                         } label: {

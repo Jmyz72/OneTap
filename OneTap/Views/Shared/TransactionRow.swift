@@ -30,7 +30,6 @@ struct TransactionRow: View {
                         Circle()
                             .stroke(categoryColor.opacity(0.3), lineWidth: 1)
                     )
-                    .shadow(color: categoryColor.opacity(0.3), radius: 8, x: 0, y: 4)
 
                 Image(systemName: categoryIcon)
                     .font(.system(size: 20, weight: .semibold))
@@ -86,7 +85,6 @@ struct TransactionRow: View {
                 Text(transaction.formattedAmount)
                     .font(.system(size: 18, weight: .black, design: .rounded))
                     .gradientForeground(amountGradient)
-                    .shadow(color: amountColor.opacity(0.3), radius: 4, x: 0, y: 2)
 
                 HStack(spacing: 4) {
                     if transaction.recurringTransaction != nil {
@@ -137,8 +135,7 @@ struct TransactionRow: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
-        .shadow(color: categoryColor.opacity(0.1), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.2), radius: 8, x: 0, y: 4)
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
     }

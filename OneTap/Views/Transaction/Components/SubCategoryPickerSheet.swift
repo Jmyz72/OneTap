@@ -30,7 +30,7 @@ struct SubCategoryPickerSheet: View {
                         skipButton
 
                         // Subcategory options
-                        ForEach(subcategories) { subcategory in
+                        ForEach(subcategories, id: \.objectID) { subcategory in
                             subcategoryButton(subcategory)
                         }
                     }

@@ -82,7 +82,7 @@ private struct TransactionListContent: View {
                     .background(AppTheme.secondaryBackground.opacity(0.3))
 
                     if let transactions = viewModel.sectionedTransactions[sectionKey] {
-                        ForEach(transactions) { transaction in
+                        ForEach(transactions, id: \.objectID) { transaction in
                             VStack(spacing: 0) {
                                 NavigationLink(destination: TransactionDetailView(transaction: transaction)) {
                                     AccountTransactionRow(transaction: transaction)

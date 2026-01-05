@@ -16,44 +16,13 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
     @Published var sectionedTransactions: [String: [Transaction]] = [:]
     @Published var sections: [String] = []
     @Published var searchText = ""
-    @Published var selectedDateFilter: DateFilter = .all
-    @Published var selectedCategoryFilter: Category?
-    @Published var selectedSubCategoryFilter: SubCategory?
+    @Published var selectedMonth: Date = {
+        let calendar = Calendar.current
+        return calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) ?? Date()
+    }()
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
-
-    // MARK: - Date Filter Enum
-    enum DateFilter: String, CaseIterable, Identifiable {
-        case all = "All Time"
-        case thisMonth = "This Month"
-        case lastMonth = "Last Month"
-        case thisYear = "This Year"
-
-        var id: String { rawValue }
-
-        var dateRange: (start: Date, end: Date)? {
-            let calendar = Calendar.current
-            let now = Date()
-
-            switch self {
-            case .all:
-                return nil
-            case .thisMonth:
-                guard let start = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
-                      let end = calendar.date(byAdding: .month, value: 1, to: start) else { return nil }
-                return (start, end)
-            case .lastMonth:
-                guard let startOfThisMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
-                      let start = calendar.date(byAdding: .month, value: -1, to: startOfThisMonth) else { return nil }
-                return (start, startOfThisMonth)
-            case .thisYear:
-                guard let start = calendar.date(from: calendar.dateComponents([.year], from: now)),
-                      let end = calendar.date(byAdding: .year, value: 1, to: start) else { return nil }
-                return (start, end)
-            }
-        }
-    }
 
     // MARK: - Dependencies
     private let transactionRepository: TransactionRepository
@@ -68,18 +37,14 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
     // MARK: - Subscriptions
 
     private func setupSubscriptions() {
-        Publishers.CombineLatest4(
+        Publishers.CombineLatest(
             $searchText,
-            $selectedDateFilter,
-            $selectedCategoryFilter,
-            $selectedSubCategoryFilter
+            $selectedMonth
         )
-        .sink { [weak self] searchText, dateFilter, category, subCategory in
+        .sink { [weak self] searchText, selectedMonth in
             self?.fetchTransactions(
                 searchText: searchText,
-                dateFilter: dateFilter,
-                category: category,
-                subCategory: subCategory
+                selectedMonth: selectedMonth
             )
         }
         .store(in: &cancellables)
@@ -89,9 +54,7 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
 
     private func fetchTransactions(
         searchText: String,
-        dateFilter: DateFilter,
-        category: Category?,
-        subCategory: SubCategory?
+        selectedMonth: Date
     ) {
         loadingState = .loading
 
@@ -108,18 +71,10 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
             predicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: [titlePredicate, merchantPredicate]))
         }
 
-        // Category predicate
-        if let category = category {
-            predicates.append(NSPredicate(format: "category == %@", category))
-        }
-
-        // SubCategory predicate
-        if let subCategory = subCategory {
-            predicates.append(NSPredicate(format: "subCategory == %@", subCategory))
-        }
-
-        // Date predicate
-        if let (startDate, endDate) = dateFilter.dateRange {
+        // Date predicate for selected month
+        let calendar = Calendar.current
+        if let startDate = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedMonth)),
+           let endDate = calendar.date(byAdding: .month, value: 1, to: startDate) {
             predicates.append(NSPredicate(format: "date >= %@ AND date < %@", startDate as NSDate, endDate as NSDate))
         }
 
@@ -156,5 +111,27 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
 
         let formatter = Formatters.currencyFormatter(for: SettingsManager.shared.currencyCode)
         return formatter.string(from: NSNumber(value: total)) ?? "$0.00"
+    }
+
+    // MARK: - Month Navigation
+
+    var selectedMonthFormatted: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: selectedMonth)
+    }
+
+    func goToPreviousMonth() {
+        let calendar = Calendar.current
+        if let newMonth = calendar.date(byAdding: .month, value: -1, to: selectedMonth) {
+            selectedMonth = newMonth
+        }
+    }
+
+    func goToNextMonth() {
+        let calendar = Calendar.current
+        if let newMonth = calendar.date(byAdding: .month, value: 1, to: selectedMonth) {
+            selectedMonth = newMonth
+        }
     }
 }

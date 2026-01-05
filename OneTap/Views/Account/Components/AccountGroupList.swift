@@ -36,7 +36,7 @@ struct AccountGroupList: View {
                         .padding(.horizontal, 4)
                         
                         // Group Accounts
-                        ForEach(groupAccounts) { account in
+                        ForEach(groupAccounts, id: \.objectID) { account in
                             NavigationLink(destination: AccountDetailView(account: account)) {
                                 AccountRow(account: account)
                             }
@@ -47,7 +47,7 @@ struct AccountGroupList: View {
                                 } label: {
                                     Label("Edit", systemImage: "pencil")
                                 }
-                                
+
                                 Button(role: .destructive) {
                                     Task {
                                         await viewModel.deleteAccount(account)
