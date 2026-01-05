@@ -29,6 +29,13 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     // Recurring State
     @Published var isRecurring = false
     @Published var frequency = "Monthly"
+    @Published var interval = 1
+    @Published var hasOccurrenceLimit = false
+    @Published var occurrenceLimitString = ""
+    @Published var hasEndDate = false
+    @Published var endDate: Date?
+    @Published var selectedWeekdays: Set<Int> = [] // 1=Sunday, 2=Monday, etc.
+    @Published var selectedMonthDay: Int = 1 // 0=Last Day, 1-31=Specific day
     let frequencies = ["Daily", "Weekly", "Monthly", "Yearly"]
 
     // Data from repositories
@@ -95,6 +102,13 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         } else {
             return splitItems.reduce(0) { $0 + $1.amount } + (Double(amountString) ?? 0)
         }
+    }
+
+    var occurrenceLimit: Int? {
+        guard hasOccurrenceLimit, let limit = Int(occurrenceLimitString), limit > 0 else {
+            return nil
+        }
+        return limit
     }
 
     // MARK: - Observation
@@ -228,6 +242,14 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                 }
 
                 if isRecurring {
+                    // Prepare weekly days string
+                    let weeklyDaysString: String? = frequency == "Weekly" && !selectedWeekdays.isEmpty
+                        ? selectedWeekdays.sorted().map { String($0) }.joined(separator: ",")
+                        : nil
+
+                    // Prepare monthly day
+                    let monthlyDayValue: Int? = frequency == "Monthly" ? selectedMonthDay : nil
+
                     // Create Recurring Template
                     let recurring = try recurringTransactionRepository.createRecurring(
                         amount: totalAmount,
@@ -239,20 +261,18 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                         subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
                         title: transactionTitle.isEmpty ? nil : transactionTitle,
                         merchant: merchant.isEmpty ? nil : merchant,
-                        notes: note.isEmpty ? nil : note
+                        notes: note.isEmpty ? nil : note,
+                        toAccount: nil,
+                        occurrenceLimit: occurrenceLimit,
+                        endDate: hasEndDate ? endDate : nil,
+                        interval: interval,
+                        weeklyDays: weeklyDaysString,
+                        monthlyDay: monthlyDayValue
                     )
 
                     // Add split items to template if any
                     if !splitItems.isEmpty {
-                        for item in splitItems {
-                            let recItem = RecurringTransactionItem(context: recurringTransactionRepository.context)
-                            recItem.id = UUID()
-                            recItem.title = item.title
-                            recItem.amount = item.amount
-                            recItem.category = item.category
-                            recItem.subCategory = item.subCategory
-                            recItem.recurringTransaction = recurring
-                        }
+                        try recurringTransactionRepository.addSplitItems(splitItems, to: recurring)
                     }
 
                     try recurringTransactionRepository.save()

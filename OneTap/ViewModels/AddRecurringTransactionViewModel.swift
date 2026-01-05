@@ -22,6 +22,7 @@ class AddRecurringTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var title = ""
     @Published var merchant = ""
     @Published var note = ""
+    @Published var splitItems: [SplitItemData] = []
 
     // Recurring-specific
     @Published var frequency = "Monthly"
@@ -69,8 +70,24 @@ class AddRecurringTransactionViewModel: ObservableObject, ViewModelProtocol {
     // MARK: - Computed Properties
 
     var isValid: Bool {
-        guard let amount = Double(amountString), amount > 0 else { return false }
-        return selectedAccount != nil && selectedCategory != nil
+        // If we have split items, amount can be zero
+        if splitItems.isEmpty {
+            guard let amount = Double(amountString), amount > 0 else {
+                return false
+            }
+            return selectedAccount != nil && selectedCategory != nil
+        }
+
+        // With split items, we only need account
+        return selectedAccount != nil
+    }
+
+    var totalAmount: Double {
+        if splitItems.isEmpty {
+            return Double(amountString) ?? 0
+        } else {
+            return splitItems.reduce(0) { $0 + $1.amount } + (Double(amountString) ?? 0)
+        }
     }
 
     var occurrenceLimit: Int? {
@@ -154,22 +171,57 @@ class AddRecurringTransactionViewModel: ObservableObject, ViewModelProtocol {
             .store(in: &cancellables)
     }
 
+    // MARK: - Split Items Management
+
+    func addSplitItem() {
+        guard let amount = Double(amountString), amount > 0, let category = selectedCategory else {
+            return
+        }
+
+        let item = SplitItemData(
+            title: note.isEmpty ? (category.name ?? "") : note,
+            amount: amount,
+            category: category,
+            subCategory: selectedSubCategory
+        )
+
+        splitItems.append(item)
+        amountString = "0"
+        note = ""
+        selectedSubCategory = nil
+    }
+
+    func removeSplitItem(at index: Int) {
+        guard index < splitItems.count else { return }
+        splitItems.remove(at: index)
+    }
+
     // MARK: - Actions
 
     func saveRecurringTransaction() async {
         startLoading()
 
         do {
-            guard let amount = Double(amountString), amount > 0 else {
-                throw ValidationError.invalidAmount
+            // Add final item to split if needed
+            if !splitItems.isEmpty, let amount = Double(amountString), amount > 0, let category = selectedCategory {
+                let lastItem = SplitItemData(
+                    title: note.isEmpty ? (category.name ?? "") : note,
+                    amount: amount,
+                    category: category,
+                    subCategory: selectedSubCategory
+                )
+                splitItems.append(lastItem)
             }
 
             guard let account = selectedAccount else {
                 throw ValidationError.missingAccount
             }
 
-            guard let category = selectedCategory else {
-                throw ValidationError.missingCategory
+            // Validate category if no split items
+            if splitItems.isEmpty {
+                guard selectedCategory != nil else {
+                    throw ValidationError.missingCategory
+                }
             }
 
             // Prepare weekly days string
@@ -181,14 +233,14 @@ class AddRecurringTransactionViewModel: ObservableObject, ViewModelProtocol {
             let monthlyDayValue: Int? = frequency == "Monthly" ? selectedMonthDay : nil
 
             // Create Recurring Template
-            _ = try recurringTransactionRepository.createRecurring(
-                amount: amount,
+            let recurring = try recurringTransactionRepository.createRecurring(
+                amount: totalAmount,
                 frequency: frequency,
                 startDate: startDate,
                 type: selectedType,
                 account: account,
-                category: category,
-                subCategory: selectedSubCategory,
+                category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
+                subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
                 title: title.isEmpty ? nil : title,
                 merchant: merchant.isEmpty ? nil : merchant,
                 notes: note.isEmpty ? nil : note,
@@ -199,6 +251,11 @@ class AddRecurringTransactionViewModel: ObservableObject, ViewModelProtocol {
                 weeklyDays: weeklyDaysString,
                 monthlyDay: monthlyDayValue
             )
+
+            // Add split items if present
+            if !splitItems.isEmpty {
+                try recurringTransactionRepository.addSplitItems(splitItems, to: recurring)
+            }
 
             try recurringTransactionRepository.save()
 

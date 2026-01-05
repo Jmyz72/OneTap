@@ -99,6 +99,7 @@ class PersistenceController {
     }()
 
     let container: NSPersistentContainer
+    private var contextSaveObserver: NSObjectProtocol?
 
     init(inMemory: Bool = false) {
         container = NSPersistentContainer(name: "OneTap")
@@ -121,7 +122,7 @@ class PersistenceController {
                         let url = storeDescription.url!
                         try self.container.persistentStoreCoordinator.destroyPersistentStore(at: url, ofType: storeDescription.type, options: nil)
                         print("Migration failed. Persistent store destroyed. Recreating...")
-                        
+
                         // Retry loading
                         self.container.loadPersistentStores { _, retryError in
                             if let retryError = retryError as NSError? {
@@ -136,12 +137,54 @@ class PersistenceController {
                 }
             }
         })
+
+        // Configure view context to automatically merge and refresh changes from background contexts
         container.viewContext.automaticallyMergesChangesFromParent = true
+
+        // CRITICAL FIX: Ensure objects are refreshed when background contexts save
+        // This ensures Transaction.balanceAfter updates are immediately visible in the UI
+        contextSaveObserver = NotificationCenter.default.addObserver(
+            forName: .NSManagedObjectContextDidSave,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self else { return }
+
+            // Only handle saves from background contexts, not the view context itself
+            guard let context = notification.object as? NSManagedObjectContext,
+                  context !== self.container.viewContext,
+                  context.persistentStoreCoordinator === self.container.persistentStoreCoordinator else {
+                return
+            }
+
+            // Merge changes into view context
+            self.container.viewContext.perform {
+                // Refresh updated objects to ensure UI shows latest values
+                if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
+                    for object in updatedObjects {
+                        // Get the object in the view context and refresh it
+                        if let viewContextObject = try? self.container.viewContext.existingObject(with: object.objectID) {
+                            self.container.viewContext.refresh(viewContextObject, mergeChanges: true)
+                        }
+                    }
+
+                    // CRITICAL: Process pending changes to trigger .NSManagedObjectContextObjectsDidChange
+                    // This ensures Combine publishers and observers are notified
+                    self.container.viewContext.processPendingChanges()
+                }
+            }
+        }
         
         // Seed categories if empty
         seedCategoriesIfEmpty()
     }
-    
+
+    deinit {
+        if let observer = contextSaveObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
     private func seedCategoriesIfEmpty() {
         let context = container.viewContext
         let request: NSFetchRequest<Category> = Category.fetchRequest()

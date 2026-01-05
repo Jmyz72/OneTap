@@ -7,12 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		00C880CE2F0AE4050076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 02.07.51.png in Resources */ = {isa = PBXBuildFile; fileRef = 00C880CD2F0AE4050076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 02.07.51.png */; };
+		00C880D62F0AF63B0076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 03.25.26.png in Resources */ = {isa = PBXBuildFile; fileRef = 00C880D52F0AF63B0076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 03.25.26.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		003155CB2F0223470060115D /* OneTap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OneTap.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		00C880CD2F0AE4050076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 02.07.51.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 02.07.51.png"; sourceTree = "<group>"; };
+		00C880D52F0AF63B0076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 03.25.26.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 03.25.26.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -37,7 +37,7 @@
 		003155C22F0223470060115D = {
 			isa = PBXGroup;
 			children = (
-				00C880CD2F0AE4050076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 02.07.51.png */,
+				00C880D52F0AF63B0076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 03.25.26.png */,
 				003155CD2F0223470060115D /* OneTap */,
 				003155CC2F0223470060115D /* Products */,
 			);
@@ -115,7 +115,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00C880CE2F0AE4050076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 02.07.51.png in Resources */,
+				00C880D62F0AF63B0076B232 /* Simulator Screenshot - iPhone 17 Pro Max - 2026-01-05 at 03.25.26.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -51,15 +51,6 @@ struct TransactionMiddleBar: View {
                     }
                 }
 
-                // Recurring Chip
-                Button(action: onRecurringTap) {
-                    chipView(
-                        icon: "repeat",
-                        text: isRecurring ? frequency : "Make Recurring",
-                        isActive: isRecurring
-                    )
-                }
-
                 // Split Chip (Expense only)
                 if selectedType == .expense {
                     Button(action: onSplitTap) {
@@ -88,6 +79,15 @@ struct TransactionMiddleBar: View {
                         icon: "note.text",
                         text: note.isEmpty ? "Add Note" : "Note Added",
                         isActive: !note.isEmpty
+                    )
+                }
+
+                // Recurring Chip (Last)
+                Button(action: onRecurringTap) {
+                    chipView(
+                        icon: "repeat",
+                        text: isRecurring ? frequency : "Make Recurring",
+                        isActive: isRecurring
                     )
                 }
             }

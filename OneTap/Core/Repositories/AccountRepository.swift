@@ -24,13 +24,15 @@ class AccountRepository: BaseRepository {
     func accountsPublisher() -> AnyPublisher<[Account], Error> {
         let initialAccounts = fetchAccounts(group: nil)
         let subject = CurrentValueSubject<[Account], Error>(initialAccounts)
-
-        // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
+        
+        // Observe Core Data changes (from any context, to catch BalanceService background updates)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
-                let accounts = self.fetchAccounts(group: nil)
-                subject.send(accounts)
+                self.context.perform {
+                    let accounts = self.fetchAccounts(group: nil)
+                    subject.send(accounts)
+                }
             }
             .store(in: &cancellables)
 
@@ -41,8 +43,8 @@ class AccountRepository: BaseRepository {
         let initialAccount = findByID(id)
         let subject = CurrentValueSubject<Account?, Error>(initialAccount)
 
-        // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
+        // Observe Core Data changes (from any context, to catch BalanceService background updates)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: nil)
             .sink { [weak self] _ in
                 guard let self = self else { return }
                 let account = self.findByID(id)

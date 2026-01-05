@@ -32,17 +32,19 @@ class TransactionRepository: BaseRepository {
         let subject = CurrentValueSubject<[Transaction], Error>(initialTransactions)
 
         // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
             .sink { [weak self] _ in
                 guard let self = self else { return }
-                if let account = (try? self.context.existingObject(with: accountID)) as? Account {
-                    let transactions = self.fetchTransactions(
-                        for: account,
-                        from: date,
-                        to: nil,
-                        sortAscending: false
-                    )
-                    subject.send(transactions)
+                self.context.perform {
+                    if let account = (try? self.context.existingObject(with: accountID)) as? Account {
+                        let transactions = self.fetchTransactions(
+                            for: account,
+                            from: date,
+                            to: nil,
+                            sortAscending: false
+                        )
+                        subject.send(transactions)
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -51,20 +53,22 @@ class TransactionRepository: BaseRepository {
     }
 
     func transactionsByDatePublisher(predicate: NSPredicate?) -> AnyPublisher<[String: [Transaction]], Error> {
+        // Initial fetch
         let transactions = fetch(predicate: predicate, sortDescriptors: [
             NSSortDescriptor(keyPath: \Transaction.date, ascending: false)
         ])
+
         let grouped = Dictionary(grouping: transactions) { transaction in
             guard let date = transaction.date else { return "" }
             return Formatters.date.string(from: date)
         }
-        
+
         let subject = CurrentValueSubject<[String: [Transaction]], Error>(grouped)
 
-        // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
-            .sink { [weak self] _ in
-                guard let self = self else { return }
+        // Helper to refetch and emit
+        let refetchAndEmit: () -> Void = { [weak self, weak subject] in
+            guard let self = self, let subject = subject else { return }
+            self.context.perform {
                 let transactions = self.fetch(predicate: predicate, sortDescriptors: [
                     NSSortDescriptor(keyPath: \Transaction.date, ascending: false)
                 ])
@@ -73,6 +77,35 @@ class TransactionRepository: BaseRepository {
                     return Formatters.date.string(from: date)
                 }
                 subject.send(grouped)
+            }
+        }
+
+        // Observe view context changes
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+            .sink { _ in
+                refetchAndEmit()
+            }
+            .store(in: &cancellables)
+
+        // CRITICAL FIX: Also observe background context saves to catch balance recalculations
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .sink { [weak self] notification in
+                guard let self = self else { return }
+
+                // Only handle saves from background contexts, not the view context itself
+                guard let savedContext = notification.object as? NSManagedObjectContext,
+                      savedContext !== self.context,
+                      savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
+                    return
+                }
+
+                // Check if any Transaction objects were updated
+                if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
+                    let hasTransactionUpdates = updatedObjects.contains { $0 is Transaction }
+                    if hasTransactionUpdates {
+                        refetchAndEmit()
+                    }
+                }
             }
             .store(in: &cancellables)
 
