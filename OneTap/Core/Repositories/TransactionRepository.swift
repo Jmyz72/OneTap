@@ -150,8 +150,19 @@ class TransactionRepository: BaseRepository {
         category: Category?,
         subCategory: SubCategory?,
         merchant: String? = nil,
-        notes: String?
+        notes: String?,
+        adjustmentReason: String? = nil
     ) throws -> Transaction {
+        // CRITICAL: Adjustment transactions must have a reason for audit trail
+        if type == .adjustment {
+            guard let reason = adjustmentReason, !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw ServiceError.validationFailed(
+                    "Adjustment transactions require a reason for the audit trail. " +
+                    "Please explain why the balance is being adjusted."
+                )
+            }
+        }
+
         let transaction = Transaction(context: context)
         transaction.id = UUID()
         transaction.title = title
@@ -163,6 +174,7 @@ class TransactionRepository: BaseRepository {
         transaction.subCategory = subCategory
         transaction.merchant = merchant
         transaction.notes = notes
+        transaction.adjustmentReason = adjustmentReason
         transaction.createdAt = Date()
         transaction.updatedAt = Date()
         transaction.balanceAfter = 0 // Will be calculated by BalanceService
