@@ -48,8 +48,25 @@ class ValidationService: ValidationServiceProtocol {
         }
 
         // Validate account
-        guard account != nil else {
+        guard let account = account else {
             throw ValidationError.missingAccount
+        }
+
+        // CRITICAL: Enforce credit limit for credit card expenses
+        if account.typeEnum == .creditCard && type == .expense {
+            let currentOwed = account.balance  // For credit cards, positive balance = amount owed
+            let newBalance = currentOwed + amount
+
+            if account.creditLimit > 0 && newBalance > account.creditLimit {
+                let available = max(0, account.creditLimit - currentOwed)
+                let formatter = Formatters.currencyFormatter(for: account.currency ?? "USD")
+                let availableStr = formatter.string(from: NSNumber(value: available)) ?? "\(available)"
+                let limitStr = formatter.string(from: NSNumber(value: account.creditLimit)) ?? "\(account.creditLimit)"
+
+                throw ServiceError.validationFailed(
+                    "Transaction would exceed credit limit of \(limitStr). Available credit: \(availableStr)"
+                )
+            }
         }
 
         // Type-specific validation
@@ -61,8 +78,18 @@ class ValidationService: ValidationServiceProtocol {
             }
 
             // Cannot transfer to same account
-            if account?.id == toAccount?.id {
+            if account.id == toAccount?.id {
                 throw ServiceError.validationFailed("Cannot transfer to the same account")
+            }
+
+            // CRITICAL: Currency must match between accounts
+            let fromCurrency = account.currency ?? SettingsManager.shared.currencyCode
+            let toCurrency = toAccount?.currency ?? SettingsManager.shared.currencyCode
+            if fromCurrency != toCurrency {
+                throw ServiceError.validationFailed(
+                    "Cannot transfer between accounts with different currencies (\(fromCurrency) → \(toCurrency)). " +
+                    "Please use adjustment transactions to handle currency conversions manually."
+                )
             }
 
         case .expense, .income:

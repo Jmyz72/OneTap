@@ -105,7 +105,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         if splitItems.isEmpty {
             return Double(amountString) ?? 0
         } else {
-            return splitItems.reduce(0) { $0 + $1.amount } + (Double(amountString) ?? 0)
+            // When split items exist, use their sum as the transaction amount
+            return splitItems.reduce(0) { $0 + $1.amount }
         }
     }
 
@@ -218,6 +219,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
             // Validate split transaction totals
             if !splitItems.isEmpty {
                 let splitTotal = splitItems.reduce(0) { $0 + $1.amount }
+                let expectedAmount = Double(amountString) ?? 0
+
                 // Ensure split items have positive amounts
                 guard splitItems.allSatisfy({ $0.amount > 0 }) else {
                     throw ValidationError.invalidAmount
@@ -229,6 +232,12 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                 // Split total becomes the transaction amount
                 guard splitTotal > 0 else {
                     throw ValidationError.invalidAmount
+                }
+
+                // CRITICAL: Ensure split items sum equals the expected transaction amount
+                // Allow 0.01 tolerance for floating point precision
+                guard abs(splitTotal - expectedAmount) < 0.01 else {
+                    throw ValidationError.splitItemsMismatch(expected: expectedAmount, actual: splitTotal)
                 }
             }
 
