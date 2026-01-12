@@ -18,7 +18,7 @@ class BalanceService: BalanceServiceProtocol {
     private let container: NSPersistentContainer
 
     // Thread-safe locking mechanism to prevent concurrent balance recalculations for the same account
-    private var accountLocks: [NSManagedObjectID: NSLock] = [:]
+    private var accountLocks: [NSManagedObjectID: DispatchSemaphore] = [:]
     private let locksQueue = DispatchQueue(label: "com.onetap.balanceservice.locks", attributes: .concurrent)
 
     init(container: NSPersistentContainer) {
@@ -32,16 +32,21 @@ class BalanceService: BalanceServiceProtocol {
     ///   - accountID: The NSManagedObjectID of the account
     ///   - date: Optional starting date for optimization. If nil, recalculates all transactions
     func recalculateBalances(for accountID: NSManagedObjectID, from date: Date?) async throws {
-        // Acquire lock for this account to prevent concurrent recalculations
-        let lock = getLock(for: accountID)
-        lock.lock()
-        defer { lock.unlock() }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            container.performBackgroundTask { [weak self] context in
+                guard let self = self else {
+                    continuation.resume(throwing: ServiceError.operationFailed("Service deallocated"))
+                    return
+                }
 
-        try await withCheckedThrowingContinuation { continuation in
-            container.performBackgroundTask { context in
+                // Acquire lock for this account to prevent concurrent recalculations
+                let semaphore = self.getSemaphore(for: accountID)
+                semaphore.wait()
+                defer { semaphore.signal() }
+
                 do {
                     try self.performRecalculation(for: accountID, from: date, in: context)
-                    continuation.resume()
+                    continuation.resume(returning: ())
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -54,13 +59,18 @@ class BalanceService: BalanceServiceProtocol {
     ///   - accounts: Array of NSManagedObjectIDs for accounts
     ///   - date: Optional starting date for optimization
     func recalculateBalances(for accounts: [NSManagedObjectID], from date: Date?) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            container.performBackgroundTask { context in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            container.performBackgroundTask { [weak self] context in
+                guard let self = self else {
+                    continuation.resume(throwing: ServiceError.operationFailed("Service deallocated"))
+                    return
+                }
+
                 do {
                     for accountID in accounts {
                         try self.performRecalculation(for: accountID, from: date, in: context)
                     }
-                    continuation.resume()
+                    continuation.resume(returning: ())
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -70,17 +80,17 @@ class BalanceService: BalanceServiceProtocol {
 
     // MARK: - Private Implementation
 
-    /// Thread-safe method to get or create a lock for an account
+    /// Thread-safe method to get or create a semaphore for an account
     /// - Parameter accountID: The account's managed object ID
-    /// - Returns: NSLock for the specified account
-    private func getLock(for accountID: NSManagedObjectID) -> NSLock {
-        return locksQueue.sync(flags: .barrier) { () -> NSLock in
-            if let existingLock = accountLocks[accountID] {
-                return existingLock
+    /// - Returns: DispatchSemaphore for the specified account
+    private func getSemaphore(for accountID: NSManagedObjectID) -> DispatchSemaphore {
+        return locksQueue.sync(flags: .barrier) { () -> DispatchSemaphore in
+            if let existingSemaphore = accountLocks[accountID] {
+                return existingSemaphore
             }
-            let newLock = NSLock()
-            accountLocks[accountID] = newLock
-            return newLock
+            let newSemaphore = DispatchSemaphore(value: 1)
+            accountLocks[accountID] = newSemaphore
+            return newSemaphore
         }
     }
 
