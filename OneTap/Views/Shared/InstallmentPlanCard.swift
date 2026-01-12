@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+internal import CoreData
 
 struct InstallmentPlanCard: View {
     let plan: RecurringTransaction

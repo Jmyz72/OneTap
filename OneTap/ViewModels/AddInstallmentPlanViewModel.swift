@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
+internal import CoreData
 
 @MainActor
 class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {

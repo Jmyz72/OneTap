@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+internal import CoreData
 
 struct AddInstallmentPlanView: View {
     @EnvironmentObject private var container: DependencyContainer
@@ -264,7 +265,7 @@ private struct FormSection<Content: View>: View {
                 content()
             }
             .padding(16)
-            .background(AppTheme.card)
+            .background(AppTheme.cardBackground)
             .cornerRadius(12)
         }
     }
