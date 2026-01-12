@@ -127,16 +127,45 @@ class AccountRepository: BaseRepository {
         }
     }
 
+    /// Archives an account (soft delete - preserves transactions)
+    func archiveAccount(_ account: Account) throws {
+        account.isArchived = true
+        // Note: Transactions are preserved
+    }
+
+    /// Unarchives an account (restores from archive)
+    func unarchiveAccount(_ account: Account) throws {
+        account.isArchived = false
+    }
+
+    /// Permanently deletes an account (WARNING: Cannot be undone)
+    /// CRITICAL: This will orphan all transactions (deletionRule changed to Nullify)
     func deleteAccount(_ account: Account) throws {
-        // Core Data cascade rules will handle transaction deletion
+        let transactionCount = account.transactions?.count ?? 0
+
+        // Warn if account has transactions
+        if transactionCount > 0 {
+            throw ServiceError.validationFailed(
+                "This account has \(transactionCount) transactions. " +
+                "Deleting it will orphan all transaction history. " +
+                "Consider archiving instead to preserve history."
+            )
+        }
+
+        // Proceed with deletion if no transactions
         context.delete(account)
     }
 
     // MARK: - Queries
 
-    func fetchAccounts(group: AccountGroup?) -> [Account] {
+    func fetchAccounts(group: AccountGroup?, includeArchived: Bool = false) -> [Account] {
         let request = NSFetchRequest<Account>(entityName: "Account")
         request.sortDescriptors = [NSSortDescriptor(keyPath: \Account.name, ascending: true)]
+
+        // CRITICAL: Filter out archived accounts by default
+        if !includeArchived {
+            request.predicate = NSPredicate(format: "isArchived == NO")
+        }
 
         do {
             let accounts = try context.fetch(request)

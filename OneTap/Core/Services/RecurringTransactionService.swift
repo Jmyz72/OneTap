@@ -193,36 +193,46 @@ class RecurringTransactionService {
             // For monthly, we need to generate on a specific day of the month
             let monthlyDay = Int(recurring.monthlyDay)
 
-            if monthlyDay == 0 {
-                // Last day of month
-                guard let nextMonth = calendar.date(byAdding: .month, value: interval, to: date) else {
+            if monthlyDay == 0 || monthlyDay > 28 {
+                // Last day of month OR day 29-31 (use last-day-of-month logic)
+                // CRITICAL FIX: For dates like "monthly on 31st", always use last day
+                // to avoid drift (Feb 28 → March 28 → April 28 bug)
+
+                var monthsToAdd = interval
+                var components = calendar.dateComponents([.year, .month, .day], from: date)
+
+                // Add the specified number of months
+                components.month = (components.month ?? 1) + monthsToAdd
+
+                // Get first day of target month
+                components.day = 1
+                guard let firstOfMonth = calendar.date(from: components) else {
                     return nil
                 }
 
-                // Get the range of days in that month
-                let range = calendar.range(of: .day, in: .month, for: nextMonth)
+                // Get last day of that month
+                let range = calendar.range(of: .day, in: .month, for: firstOfMonth)
                 let lastDay = range?.count ?? 28
 
-                var components = calendar.dateComponents([.year, .month], from: nextMonth)
-                components.day = lastDay
+                // Set to either the requested day (if <= lastDay) or last day
+                if monthlyDay == 0 {
+                    components.day = lastDay  // Explicitly "last day"
+                } else {
+                    components.day = min(monthlyDay, lastDay)  // Day 29-31
+                }
+
                 components.hour = timeComponents.hour
                 components.minute = timeComponents.minute
                 components.second = timeComponents.second
                 return calendar.date(from: components)
             } else {
-                // Specific day of month (1-31)
+                // Day 1-28: safe to use standard month addition
                 guard let nextMonth = calendar.date(byAdding: .month, value: interval, to: date) else {
                     return nil
                 }
 
                 var components = calendar.dateComponents([.year, .month], from: nextMonth)
-
-                // Get the range of days in that month
-                let range = calendar.range(of: .day, in: .month, for: nextMonth)
-                let daysInMonth = range?.count ?? 28
-
-                // Use the specified day, or last day if the month doesn't have that many days
-                components.day = min(monthlyDay, daysInMonth)
+                components.day = monthlyDay
                 components.hour = timeComponents.hour
                 components.minute = timeComponents.minute
                 components.second = timeComponents.second
@@ -344,6 +354,7 @@ class RecurringTransactionService {
     }
 
     /// Calculates the next billing date based on billing day
+    /// CRITICAL FIX: Properly handles day 29-31 to avoid drift across months
     private func calculateNextBillingDate(from date: Date, billingDay: Int16) -> Date {
         let calendar = Calendar.current
         let day = Int(billingDay)
@@ -354,18 +365,23 @@ class RecurringTransactionService {
         components.minute = 0
         components.second = 0
 
-        if day == 0 {
-            // Last day of month
-            guard let currentMonthDate = calendar.date(from: components),
-                  let range = calendar.range(of: .day, in: .month, for: currentMonthDate) else {
+        if day == 0 || day > 28 {
+            // Last day of month OR day 29-31 (use last-day logic)
+            guard let currentMonthDate = calendar.date(from: components) else {
                 return date
             }
-            components.day = range.count
+
+            let range = calendar.range(of: .day, in: .month, for: currentMonthDate)
+            let lastDay = range?.count ?? 28
+
+            if day == 0 {
+                components.day = lastDay  // Explicitly last day
+            } else {
+                components.day = min(day, lastDay)  // Day 29-31
+            }
         } else {
-            // Specific day
-            let range = calendar.range(of: .day, in: .month, for: date)
-            let daysInMonth = range?.count ?? 28
-            components.day = min(day, daysInMonth)
+            // Day 1-28: safe to use directly
+            components.day = day
         }
 
         guard let billingDate = calendar.date(from: components) else {
@@ -374,7 +390,33 @@ class RecurringTransactionService {
 
         // If billing date is today or in the past, move to next month
         if billingDate <= date {
-            return calendar.date(byAdding: .month, value: 1, to: billingDate) ?? billingDate
+            // CRITICAL FIX: Don't just add 1 month to the date
+            // Instead, increment month and recalculate the correct day
+            var nextComponents = calendar.dateComponents([.year, .month], from: billingDate)
+            nextComponents.month = (nextComponents.month ?? 1) + 1
+            nextComponents.day = 1  // First of next month
+            nextComponents.hour = 0
+            nextComponents.minute = 0
+            nextComponents.second = 0
+
+            guard let firstOfNextMonth = calendar.date(from: nextComponents) else {
+                return date
+            }
+
+            // Get last day of next month
+            let range = calendar.range(of: .day, in: .month, for: firstOfNextMonth)
+            let lastDay = range?.count ?? 28
+
+            // Apply the same day logic
+            if day == 0 {
+                nextComponents.day = lastDay
+            } else if day > 28 {
+                nextComponents.day = min(day, lastDay)
+            } else {
+                nextComponents.day = day
+            }
+
+            return calendar.date(from: nextComponents) ?? billingDate
         }
 
         return billingDate

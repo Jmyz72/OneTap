@@ -40,6 +40,7 @@ enum ValidationError: LocalizedError {
     case emptyName
     case invalidCategoryName
     case invalidSplitItems
+    case splitItemsMismatch(expected: Double, actual: Double)
 
     var errorDescription: String? {
         switch self {
@@ -61,6 +62,13 @@ enum ValidationError: LocalizedError {
             return "Please enter a name for this category"
         case .invalidSplitItems:
             return "Split transaction must have at least one item with a valid amount"
+        case .splitItemsMismatch(let expected, let actual):
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .currency
+            formatter.currencyCode = SettingsManager.shared.currencyCode
+            let expectedStr = formatter.string(from: NSNumber(value: expected)) ?? "$\(expected)"
+            let actualStr = formatter.string(from: NSNumber(value: actual)) ?? "$\(actual)"
+            return "Split items total (\(actualStr)) must equal transaction amount (\(expectedStr))"
         }
     }
 }
