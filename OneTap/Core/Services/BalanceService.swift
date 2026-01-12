@@ -17,6 +17,10 @@ protocol BalanceServiceProtocol {
 class BalanceService: BalanceServiceProtocol {
     private let container: NSPersistentContainer
 
+    // Thread-safe locking mechanism to prevent concurrent balance recalculations for the same account
+    private var accountLocks: [NSManagedObjectID: NSLock] = [:]
+    private let locksQueue = DispatchQueue(label: "com.onetap.balanceservice.locks", attributes: .concurrent)
+
     init(container: NSPersistentContainer) {
         self.container = container
     }
@@ -28,6 +32,11 @@ class BalanceService: BalanceServiceProtocol {
     ///   - accountID: The NSManagedObjectID of the account
     ///   - date: Optional starting date for optimization. If nil, recalculates all transactions
     func recalculateBalances(for accountID: NSManagedObjectID, from date: Date?) async throws {
+        // Acquire lock for this account to prevent concurrent recalculations
+        let lock = getLock(for: accountID)
+        lock.lock()
+        defer { lock.unlock() }
+
         try await withCheckedThrowingContinuation { continuation in
             container.performBackgroundTask { context in
                 do {
@@ -60,6 +69,20 @@ class BalanceService: BalanceServiceProtocol {
     }
 
     // MARK: - Private Implementation
+
+    /// Thread-safe method to get or create a lock for an account
+    /// - Parameter accountID: The account's managed object ID
+    /// - Returns: NSLock for the specified account
+    private func getLock(for accountID: NSManagedObjectID) -> NSLock {
+        return locksQueue.sync(flags: .barrier) { () -> NSLock in
+            if let existingLock = accountLocks[accountID] {
+                return existingLock
+            }
+            let newLock = NSLock()
+            accountLocks[accountID] = newLock
+            return newLock
+        }
+    }
 
     /// Core balance recalculation logic
     /// Optimized: Runs on background thread to prevent UI freezing

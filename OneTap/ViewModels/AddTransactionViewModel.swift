@@ -80,6 +80,11 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         setupDefaults()
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     // MARK: - Computed Properties
 
     var isValid: Bool {
@@ -208,6 +213,23 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                     subCategory: selectedSubCategory
                 )
                 splitItems.append(lastItem)
+            }
+
+            // Validate split transaction totals
+            if !splitItems.isEmpty {
+                let splitTotal = splitItems.reduce(0) { $0 + $1.amount }
+                // Ensure split items have positive amounts
+                guard splitItems.allSatisfy({ $0.amount > 0 }) else {
+                    throw ValidationError.invalidAmount
+                }
+                // Ensure at least one split item exists
+                guard !splitItems.isEmpty else {
+                    throw ValidationError.invalidSplitItems
+                }
+                // Split total becomes the transaction amount
+                guard splitTotal > 0 else {
+                    throw ValidationError.invalidAmount
+                }
             }
 
             // Validation

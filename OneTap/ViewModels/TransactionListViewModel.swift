@@ -34,6 +34,12 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
         setupSubscriptions()
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+        dataCancellable?.cancel()
+    }
+
     // MARK: - Subscriptions
 
     private func setupSubscriptions() {
