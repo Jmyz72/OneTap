@@ -123,6 +123,31 @@ struct TransactionDetailView: View {
                                 }
                             }
 
+                            // Adjustment Reason Section
+                            if transaction.typeEnum == .adjustment, let reason = transaction.adjustmentReason, !reason.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Adjustment Reason")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                        .padding(.horizontal)
+
+                                    HStack(alignment: .top, spacing: 12) {
+                                        Image(systemName: "doc.text.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(.blue)
+                                            .frame(width: 30)
+
+                                        Text(reason)
+                                            .font(.system(size: 15))
+                                            .foregroundColor(AppTheme.textPrimary)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding()
+                                    .modernCardStyle()
+                                    .padding(.horizontal)
+                                }
+                            }
+
                             // Delete Button
                             Button {
                                 Task {

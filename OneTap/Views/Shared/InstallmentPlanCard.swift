@@ -111,6 +111,48 @@ struct InstallmentPlanCard: View {
                     }
                 }
             }
+
+            // Interest Information (if applicable)
+            if plan.hasInterest, plan.interestRate > 0 {
+                Divider()
+
+                HStack(spacing: 12) {
+                    // APR badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "percent")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(plan.formattedAPR)
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.purple.opacity(0.8))
+                    )
+
+                    // Total interest
+                    if let interestText = plan.formattedTotalInterest {
+                        Text(interestText)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color.purple)
+                    }
+
+                    Spacer()
+
+                    // Total cost
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Total Cost")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(AppTheme.textTertiary)
+
+                        Text(formattedAmount(plan.calculateTotalCostWithInterest()))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color.purple)
+                    }
+                }
+            }
         }
         .padding(16)
         .background(
@@ -171,57 +213,63 @@ struct InstallmentPlanCard: View {
 }
 
 #Preview {
-    VStack(spacing: 16) {
-        // Active installment - 25% complete
-        InstallmentPlanCard(plan: {
-            let container = PersistenceController.preview.container
-            let context = container.viewContext
+    ScrollView {
+        VStack(spacing: 16) {
+            // Active installment - 0% APR (no interest)
+            InstallmentPlanCard(plan: {
+                let container = PersistenceController.preview.container
+                let context = container.viewContext
 
-            let account = Account(context: context)
-            account.name = "Credit Card"
-            account.currency = "MYR"
+                let account = Account(context: context)
+                account.name = "Credit Card"
+                account.currency = "USD"
 
-            let plan = RecurringTransaction(context: context)
-            plan.id = UUID()
-            plan.title = "iPhone 15 Pro"
-            plan.merchant = "Apple Store"
-            plan.amount = 100
-            plan.totalAmount = 1200
-            plan.isInstallment = true
-            plan.isActive = true
-            plan.occurrenceLimit = 12
-            plan.occurrencesCount = 3
-            plan.nextRunDate = Date().addingTimeInterval(86400 * 5)
-            plan.account = account
+                let plan = RecurringTransaction(context: context)
+                plan.id = UUID()
+                plan.title = "iPhone 15 Pro"
+                plan.merchant = "Apple Store"
+                plan.amount = 100
+                plan.totalAmount = 1200
+                plan.isInstallment = true
+                plan.isActive = true
+                plan.hasInterest = false
+                plan.interestRate = 0.0
+                plan.occurrenceLimit = 12
+                plan.occurrencesCount = 3
+                plan.nextRunDate = Date().addingTimeInterval(86400 * 5)
+                plan.account = account
 
-            return plan
-        }())
+                return plan
+            }())
 
-        // Almost complete installment - 83% complete
-        InstallmentPlanCard(plan: {
-            let container = PersistenceController.preview.container
-            let context = container.viewContext
+            // Active installment with 15% APR
+            InstallmentPlanCard(plan: {
+                let container = PersistenceController.preview.container
+                let context = container.viewContext
 
-            let account = Account(context: context)
-            account.name = "Credit Card"
-            account.currency = "MYR"
+                let account = Account(context: context)
+                account.name = "Credit Card"
+                account.currency = "USD"
 
-            let plan = RecurringTransaction(context: context)
-            plan.id = UUID()
-            plan.title = "Laptop"
-            plan.merchant = "Tech Store"
-            plan.amount = 150
-            plan.totalAmount = 1800
-            plan.isInstallment = true
-            plan.isActive = true
-            plan.occurrenceLimit = 12
-            plan.occurrencesCount = 10
-            plan.nextRunDate = Date().addingTimeInterval(86400 * 15)
-            plan.account = account
+                let plan = RecurringTransaction(context: context)
+                plan.id = UUID()
+                plan.title = "Laptop"
+                plan.merchant = "BNPL Service"
+                plan.amount = RecurringTransaction.calculateMonthlyPayment(principal: 1800, apr: 0.15, months: 12)
+                plan.totalAmount = 1800
+                plan.isInstallment = true
+                plan.isActive = true
+                plan.hasInterest = true
+                plan.interestRate = 0.15
+                plan.occurrenceLimit = 12
+                plan.occurrencesCount = 4
+                plan.nextRunDate = Date().addingTimeInterval(86400 * 15)
+                plan.account = account
 
-            return plan
-        }())
+                return plan
+            }())
+        }
+        .padding()
     }
-    .padding()
     .background(Color(UIColor.systemGroupedBackground))
 }
