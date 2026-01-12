@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+internal import CoreData
 
 struct InstallmentDetailView: View {
     @EnvironmentObject private var container: DependencyContainer
@@ -46,7 +47,7 @@ struct InstallmentDetailView: View {
                                         }
                                     }
                                 }
-                                .background(AppTheme.card)
+                                .background(AppTheme.cardBackground)
                                 .cornerRadius(12)
                                 .padding(.horizontal)
                             }
