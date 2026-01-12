@@ -17,15 +17,15 @@ enum ServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .entityNotFound:
-            return "Entity not found"
+            return "The requested item could not be found. Please try refreshing the screen."
         case .operationFailed(let message):
-            return "Operation failed: \(message)"
+            return "We couldn't complete this action: \(message). Please try again."
         case .validationFailed(let message):
-            return "Validation failed: \(message)"
+            return message
         case .concurrencyError:
-            return "Concurrency error occurred"
+            return "Multiple operations are conflicting. Please wait a moment and try again."
         case .balanceCalculationFailed:
-            return "Failed to calculate balance"
+            return "We couldn't update your account balance. Please check your connection and try again."
         }
     }
 }
@@ -39,25 +39,28 @@ enum ValidationError: LocalizedError {
     case duplicateAccount
     case emptyName
     case invalidCategoryName
+    case invalidSplitItems
 
     var errorDescription: String? {
         switch self {
         case .invalidAmount:
-            return "Amount must be greater than 0"
+            return "Please enter an amount greater than $0"
         case .missingAccount:
-            return "Please select an account"
+            return "Please select an account before saving"
         case .missingCategory:
-            return "Please select a category"
+            return "Please select a category for this transaction"
         case .missingDestinationAccount:
-            return "Please select a destination account for transfer"
+            return "Please select a destination account for this transfer"
         case .invalidAccountName:
-            return "Account name cannot be empty"
+            return "Please enter a name for this account"
         case .duplicateAccount:
-            return "An account with this name already exists"
+            return "An account with this name already exists. Please choose a different name."
         case .emptyName:
-            return "Name cannot be empty"
+            return "Please enter a name"
         case .invalidCategoryName:
-            return "Category name cannot be empty"
+            return "Please enter a name for this category"
+        case .invalidSplitItems:
+            return "Split transaction must have at least one item with a valid amount"
         }
     }
 }

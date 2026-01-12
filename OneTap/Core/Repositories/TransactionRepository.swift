@@ -12,11 +12,27 @@ import Combine
 class TransactionRepository: BaseRepository {
     typealias Entity = Transaction
 
+    // MARK: - Configuration
+
+    private enum Configuration {
+        /// Maximum number of recent transactions to fetch for merchant autocomplete history
+        static let merchantHistoryLimit = 500
+        /// Maximum number of merchant suggestions to return in autocomplete
+        static let merchantSuggestionLimit = 10
+        /// Debounce delay in seconds for publisher updates to batch rapid changes
+        static let publisherDebounceDelay = 0.3
+    }
+
     let context: NSManagedObjectContext
     private var cancellables = Set<AnyCancellable>()
 
     init(context: NSManagedObjectContext) {
         self.context = context
+    }
+
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
     }
 
     // MARK: - Publishers
@@ -80,10 +96,13 @@ class TransactionRepository: BaseRepository {
             }
         }
 
+        // Create a trigger subject for debouncing
+        let triggerSubject = PassthroughSubject<Void, Never>()
+
         // Observe view context changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
             .sink { _ in
-                refetchAndEmit()
+                triggerSubject.send()
             }
             .store(in: &cancellables)
 
@@ -103,9 +122,17 @@ class TransactionRepository: BaseRepository {
                 if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
                     let hasTransactionUpdates = updatedObjects.contains { $0 is Transaction }
                     if hasTransactionUpdates {
-                        refetchAndEmit()
+                        triggerSubject.send()
                     }
                 }
+            }
+            .store(in: &cancellables)
+
+        // Debounce the triggers and refetch (delay batches rapid changes)
+        triggerSubject
+            .debounce(for: .seconds(Configuration.publisherDebounceDelay), scheduler: DispatchQueue.main)
+            .sink { _ in
+                refetchAndEmit()
             }
             .store(in: &cancellables)
 
@@ -210,6 +237,15 @@ class TransactionRepository: BaseRepository {
         request.predicate = predicate
         request.sortDescriptors = sortDescriptors
 
+        // Prefetch relationships to avoid N+1 query problem
+        request.relationshipKeyPathsForPrefetching = [
+            "account",
+            "category",
+            "subCategory",
+            "items",
+            "recurringTransaction"
+        ]
+
         do {
             return try context.fetch(request)
         } catch {
@@ -261,6 +297,8 @@ class TransactionRepository: BaseRepository {
         let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
         request.predicate = NSPredicate(format: "merchant != nil AND merchant != ''")
         request.sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
+        // Performance: Only fetch recent transactions to extract unique merchants
+        request.fetchLimit = Configuration.merchantHistoryLimit
 
         do {
             let transactions = try context.fetch(request)
@@ -279,7 +317,8 @@ class TransactionRepository: BaseRepository {
                 merchants = merchants.filter { $0.lowercased().contains(searchText.lowercased()) }
             }
 
-            return Array(merchants.prefix(10)) // Limit to 10 suggestions
+            // Return limited number of suggestions for autocomplete
+            return Array(merchants.prefix(Configuration.merchantSuggestionLimit))
         } catch {
             print("Error fetching merchants: \(error)")
             return []

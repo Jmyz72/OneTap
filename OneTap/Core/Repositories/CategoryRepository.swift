@@ -19,6 +19,11 @@ class CategoryRepository: BaseRepository {
         self.context = context
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     // MARK: - Publishers
 
     func categoriesPublisher(type: TransactionType?) -> AnyPublisher<[Category], Error> {

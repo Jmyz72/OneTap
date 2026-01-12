@@ -31,6 +31,11 @@ class AccountListViewModel: ObservableObject, ViewModelProtocol {
         setupSubscriptions()
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     // MARK: - Subscriptions
 
     private func setupSubscriptions() {

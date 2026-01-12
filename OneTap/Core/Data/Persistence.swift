@@ -111,6 +111,12 @@ class PersistenceController {
         if let description = container.persistentStoreDescriptions.first {
             description.shouldMigrateStoreAutomatically = true
             description.shouldInferMappingModelAutomatically = true
+
+            // Add file protection for security (data encrypted when device is locked)
+            description.setOption(
+                FileProtectionType.complete as NSObject,
+                forKey: NSPersistentStoreFileProtectionKey
+            )
         }
         
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in

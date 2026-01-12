@@ -43,11 +43,20 @@ class RecurringTransactionService {
             return
         }
 
-        let account = recurring.account
-        var accountsToUpdate: Set<NSManagedObjectID> = []
-        if let accID = account?.objectID { accountsToUpdate.insert(accID) }
+        guard let account = recurring.account else {
+            throw ServiceError.operationFailed("Account not found for recurring transaction")
+        }
 
-        while nextDate <= date {
+        var accountsToUpdate: Set<NSManagedObjectID> = []
+        accountsToUpdate.insert(account.objectID)
+
+        // Safety limit to prevent infinite loops
+        var iterationCount = 0
+        let maxIterations = 365 // Maximum iterations per recurring transaction (e.g., daily for a year)
+
+        while nextDate <= date && iterationCount < maxIterations {
+            iterationCount += 1
+
             // Check if end date is set and we're past it
             if let endDate = recurring.endDate, nextDate > endDate {
                 recurring.isActive = false
@@ -66,7 +75,7 @@ class RecurringTransactionService {
                 amount: recurring.amount,
                 type: TransactionType(rawValue: recurring.type ?? "Expense") ?? .expense,
                 date: nextDate,
-                account: account!,
+                account: account,
                 category: recurring.category,
                 subCategory: recurring.subCategory,
                 merchant: recurring.merchant,
@@ -74,6 +83,12 @@ class RecurringTransactionService {
             )
 
             transaction.recurringTransaction = recurring
+
+            // For installments, set installment tracking fields
+            if recurring.isInstallment {
+                transaction.installmentPlanID = recurring.id
+                transaction.installmentNumber = recurring.occurrencesCount + 1
+            }
 
             // Handle split items
             if let templateItems = recurring.items as? Set<RecurringTransactionItem> {
@@ -105,6 +120,11 @@ class RecurringTransactionService {
                 recurring.isActive = false
                 break
             }
+        }
+
+        // Log warning if we hit max iterations (potential infinite loop detected)
+        if iterationCount >= maxIterations {
+            print("⚠️ Warning: Hit max iteration limit (\(maxIterations)) for recurring transaction \(recurring.id?.uuidString ?? "unknown"). This may indicate a calculation error.")
         }
 
         // Recalculate balances for affected accounts
@@ -215,5 +235,149 @@ class RecurringTransactionService {
         default:
             return nil
         }
+    }
+
+    // MARK: - Installment Creation
+
+    /// Creates an installment plan with optional immediate first payment
+    /// - Parameters:
+    ///   - title: Purchase description (e.g., "iPhone 15 Pro")
+    ///   - totalAmount: Total purchase amount (e.g., $1200)
+    ///   - numberOfPayments: Number of installments (e.g., 12)
+    ///   - account: Account to charge
+    ///   - category: Category for transactions
+    ///   - subCategory: Optional subcategory
+    ///   - merchant: Optional merchant name
+    ///   - notes: Optional notes
+    ///   - firstPaymentImmediate: If true, creates first payment today
+    ///   - billingDay: Day of month for recurring payments (1-31, 0 = last day)
+    ///   - startDate: Date when installment plan begins (used if firstPaymentImmediate = false)
+    /// - Returns: Tuple of (RecurringTransaction plan, Optional first Transaction)
+    func createInstallmentPlan(
+        title: String,
+        totalAmount: Double,
+        numberOfPayments: Int16,
+        account: Account,
+        category: Category?,
+        subCategory: SubCategory?,
+        merchant: String?,
+        notes: String?,
+        firstPaymentImmediate: Bool,
+        billingDay: Int16,
+        startDate: Date = Date()
+    ) async throws -> (RecurringTransaction, Transaction?) {
+
+        guard numberOfPayments > 0 else {
+            throw ServiceError.operationFailed("Number of payments must be greater than 0")
+        }
+
+        let paymentAmount = totalAmount / Double(numberOfPayments)
+        let calendar = Calendar.current
+        let now = Date()
+
+        // Create RecurringTransaction (the installment plan)
+        let plan = RecurringTransaction(context: context)
+        plan.id = UUID()
+        plan.title = title
+        plan.amount = paymentAmount
+        plan.totalAmount = totalAmount
+        plan.type = TransactionType.expense.rawValue
+        plan.frequency = "Monthly"
+        plan.interval = 1
+        plan.isActive = true
+        plan.isInstallment = true
+        plan.firstPaymentImmediate = firstPaymentImmediate
+        plan.occurrenceLimit = numberOfPayments
+        plan.occurrencesCount = 0
+        plan.monthlyDay = billingDay
+        plan.account = account
+        plan.category = category
+        plan.subCategory = subCategory
+        plan.merchant = merchant
+        plan.notes = notes
+        plan.createdAt = now
+        plan.updatedAt = now
+
+        var firstTransaction: Transaction? = nil
+
+        if firstPaymentImmediate {
+            // Type 1: Pay first installment NOW
+            plan.startDate = now
+            plan.occurrencesCount = 1
+
+            // Create first payment immediately
+            firstTransaction = try transactionRepository.createTransaction(
+                title: title,
+                amount: paymentAmount,
+                type: .expense,
+                date: now,
+                account: account,
+                category: category,
+                subCategory: subCategory,
+                merchant: merchant,
+                notes: notes
+            )
+
+            firstTransaction?.recurringTransaction = plan
+            firstTransaction?.installmentPlanID = plan.id
+            firstTransaction?.installmentNumber = 1
+
+            // Calculate next billing date
+            let nextBillingDate = calculateNextBillingDate(from: now, billingDay: billingDay)
+            plan.nextRunDate = nextBillingDate
+            plan.lastRunDate = now
+
+        } else {
+            // Type 2: First payment on next billing date
+            let nextBillingDate = calculateNextBillingDate(from: startDate, billingDay: billingDay)
+            plan.startDate = nextBillingDate
+            plan.nextRunDate = nextBillingDate
+        }
+
+        try context.save()
+
+        // Recalculate balances if first payment was made
+        if let transaction = firstTransaction {
+            try await balanceService.recalculateBalances(for: account.objectID, from: transaction.date ?? now)
+        }
+
+        return (plan, firstTransaction)
+    }
+
+    /// Calculates the next billing date based on billing day
+    private func calculateNextBillingDate(from date: Date, billingDay: Int16) -> Date {
+        let calendar = Calendar.current
+        let day = Int(billingDay)
+
+        // Get current month's billing date
+        var components = calendar.dateComponents([.year, .month], from: date)
+        components.hour = 0
+        components.minute = 0
+        components.second = 0
+
+        if day == 0 {
+            // Last day of month
+            guard let currentMonthDate = calendar.date(from: components),
+                  let range = calendar.range(of: .day, in: .month, for: currentMonthDate) else {
+                return date
+            }
+            components.day = range.count
+        } else {
+            // Specific day
+            let range = calendar.range(of: .day, in: .month, for: date)
+            let daysInMonth = range?.count ?? 28
+            components.day = min(day, daysInMonth)
+        }
+
+        guard let billingDate = calendar.date(from: components) else {
+            return date
+        }
+
+        // If billing date is today or in the past, move to next month
+        if billingDate <= date {
+            return calendar.date(byAdding: .month, value: 1, to: billingDate) ?? billingDate
+        }
+
+        return billingDate
     }
 }

@@ -19,16 +19,33 @@ class AccountRepository: BaseRepository {
         self.context = context
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     // MARK: - Publishers
 
     func accountsPublisher() -> AnyPublisher<[Account], Error> {
         let initialAccounts = fetchAccounts(group: nil)
         let subject = CurrentValueSubject<[Account], Error>(initialAccounts)
-        
+
         // Observe Core Data changes (from any context, to catch BalanceService background updates)
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
-            .sink { [weak self] _ in
+            .sink { [weak self] notification in
                 guard let self = self else { return }
+
+                // Filter: Only refetch if Account objects were actually changed
+                let changedObjects = [
+                    notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? [],
+                    notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? [],
+                    notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+                ].flatMap { $0 }
+
+                let hasAccountChanges = changedObjects.contains { $0 is Account }
+                guard hasAccountChanges else { return }
+
+                // Only refetch when accounts actually changed
                 self.context.perform {
                     let accounts = self.fetchAccounts(group: nil)
                     subject.send(accounts)

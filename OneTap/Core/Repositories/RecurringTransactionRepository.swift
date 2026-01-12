@@ -17,6 +17,11 @@ class RecurringTransactionRepository: BaseRepository {
         self.context = context
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     // MARK: - Publishers
 
     func recurringTransactionsPublisher() -> AnyPublisher<[RecurringTransaction], Error> {
