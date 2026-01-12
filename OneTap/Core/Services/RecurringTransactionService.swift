@@ -272,7 +272,6 @@ class RecurringTransactionService {
         }
 
         let paymentAmount = totalAmount / Double(numberOfPayments)
-        let calendar = Calendar.current
         let now = Date()
 
         // Create RecurringTransaction (the installment plan)
@@ -425,7 +424,7 @@ class RecurringTransactionService {
 
         // Mark plan as completed
         plan.isActive = false
-        plan.occurrencesCount = plan.occurrenceLimit ?? 0
+        plan.occurrencesCount = plan.occurrenceLimit
         plan.lastRunDate = date
         plan.updatedAt = Date()
 

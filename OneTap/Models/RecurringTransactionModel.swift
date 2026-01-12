@@ -19,17 +19,17 @@ extension RecurringTransaction {
 
     /// Returns total original amount for installment (e.g., $1200 laptop)
     var installmentTotalAmount: Double {
-        return totalAmount ?? 0.0
+        return totalAmount
     }
 
     /// Returns whether first payment should be immediate
     var shouldPayFirstImmediately: Bool {
-        return firstPaymentImmediate ?? true
+        return firstPaymentImmediate
     }
 
     /// Number of installments remaining
     var remainingInstallments: Int16 {
-        let limit = occurrenceLimit ?? 0
+        let limit = occurrenceLimit
         return max(0, limit - occurrencesCount)
     }
 
@@ -51,13 +51,13 @@ extension RecurringTransaction {
 
     /// Formatted progress string (e.g., "3/12 payments")
     var formattedProgress: String {
-        let limit = occurrenceLimit ?? 0
+        let limit = occurrenceLimit
         return "\(occurrencesCount)/\(limit) payments"
     }
 
     /// Formatted installment display (e.g., "$100 × 12 months")
     var formattedInstallmentDisplay: String {
-        let limit = occurrenceLimit ?? 0
+        let limit = occurrenceLimit
         let formatter = Formatters.currencyFormatter(for: "MYR") // Default currency
         let amountStr = formatter.string(from: NSNumber(value: amount)) ?? "$0"
         return "\(amountStr) × \(limit) months"
@@ -68,7 +68,7 @@ extension RecurringTransaction {
         if !isActive {
             return "Inactive"
         }
-        let limit = occurrenceLimit ?? 0
+        let limit = occurrenceLimit
         if limit > 0 && occurrencesCount >= limit {
             return "Completed"
         }
@@ -78,7 +78,7 @@ extension RecurringTransaction {
     /// Color for status
     var statusColor: String {
         if !isActive { return "gray" }
-        let limit = occurrenceLimit ?? 0
+        let limit = occurrenceLimit
         if limit > 0 && occurrencesCount >= limit { return "green" }
         return "blue"
     }

@@ -98,10 +98,10 @@ extension Transaction {
 
         guard let validPlan = plan else { return nil }
 
-        let number = installmentNumber ?? 0
+        let number = installmentNumber
         guard number > 0 else { return nil }
 
-        let limit = validPlan.occurrenceLimit ?? 0
+        let limit = validPlan.occurrenceLimit
         return "Payment \(number)/\(limit)"
     }
 
