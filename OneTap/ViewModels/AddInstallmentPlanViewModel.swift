@@ -23,6 +23,10 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
     @Published var selectedCategory: Category?
     @Published var notes = ""
 
+    // Interest support
+    @Published var hasInterest = false
+    @Published var aprPercentage = ""
+
     @Published var accounts: [Account] = []
     @Published var expenseCategories: [Category] = []
 
@@ -61,15 +65,57 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
         Double(totalAmountString) ?? 0
     }
 
+    var annualInterestRate: Double {
+        guard hasInterest else { return 0 }
+        let percentage = Double(aprPercentage) ?? 0
+        return percentage / 100.0  // Convert percentage to decimal (15% -> 0.15)
+    }
+
     var monthlyPayment: Double {
         guard numberOfPayments > 0 else { return 0 }
-        return totalAmount / Double(numberOfPayments)
+        guard totalAmount > 0 else { return 0 }
+
+        if hasInterest && annualInterestRate > 0 {
+            // Use amortization formula for interest-bearing installments
+            return RecurringTransaction.calculateMonthlyPayment(
+                principal: totalAmount,
+                apr: annualInterestRate,
+                months: numberOfPayments
+            )
+        } else {
+            // Simple division for 0% APR
+            return totalAmount / Double(numberOfPayments)
+        }
+    }
+
+    var totalCostWithInterest: Double {
+        return monthlyPayment * Double(numberOfPayments)
+    }
+
+    var totalInterestCharges: Double {
+        return totalCostWithInterest - totalAmount
     }
 
     var formattedMonthlyPayment: String {
         let code = selectedAccount?.currency ?? SettingsManager.shared.currencyCode
         let formatter = Formatters.currencyFormatter(for: code)
         return formatter.string(from: NSNumber(value: monthlyPayment)) ?? "$0"
+    }
+
+    var formattedTotalCost: String {
+        let code = selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        return formatter.string(from: NSNumber(value: totalCostWithInterest)) ?? "$0"
+    }
+
+    var formattedTotalInterest: String? {
+        guard hasInterest && annualInterestRate > 0 else { return nil }
+        let code = selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        if let formatted = formatter.string(from: NSNumber(value: totalInterestCharges)) {
+            return "+\(formatted) interest"
+        }
+        return nil
     }
 
     var isValid: Bool {
@@ -147,7 +193,8 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
                 merchant: merchant.isEmpty ? nil : merchant,
                 notes: notes.isEmpty ? nil : notes,
                 firstPaymentImmediate: firstPaymentImmediate,
-                billingDay: billingDay
+                billingDay: billingDay,
+                annualInterestRate: annualInterestRate
             )
 
             loadingState = .loaded

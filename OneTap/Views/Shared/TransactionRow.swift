@@ -87,8 +87,24 @@ struct TransactionRow: View {
                     .gradientForeground(amountGradient)
 
                 HStack(spacing: 4) {
+                    // Adjustment badge (highest priority - shows reason icon)
+                    if transaction.typeEnum == .adjustment, let reason = transaction.adjustmentReason, !reason.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 8, weight: .bold))
+                            Text("Adjustment")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color.blue.opacity(0.8))
+                        )
+                    }
                     // Installment badge (priority over recurring)
-                    if transaction.isPartOfInstallment, let label = transaction.installmentLabel {
+                    else if transaction.isPartOfInstallment, let label = transaction.installmentLabel {
                         HStack(spacing: 3) {
                             Image(systemName: "creditcard.fill")
                                 .font(.system(size: 8, weight: .bold))

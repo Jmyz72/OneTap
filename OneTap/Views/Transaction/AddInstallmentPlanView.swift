@@ -133,6 +133,73 @@ private struct AddInstallmentPlanContent: View {
                             .toggleStyle(SwitchToggleStyle(tint: .orange))
                         }
 
+                        // Interest & APR
+                        FormSection(title: "Interest (Optional)") {
+                            Toggle(isOn: $viewModel.hasInterest) {
+                                Label("This plan has interest", systemImage: "percent")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .toggleStyle(SwitchToggleStyle(tint: .purple))
+
+                            if viewModel.hasInterest {
+                                FormField(label: "APR (Annual Percentage Rate)", icon: "percent") {
+                                    HStack {
+                                        TextField("e.g., 15.0", text: $viewModel.aprPercentage)
+                                            .keyboardType(.decimalPad)
+                                            .textFieldStyle(.roundedBorder)
+
+                                        Text("%")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(AppTheme.textSecondary)
+                                    }
+                                }
+
+                                // Interest breakdown
+                                if viewModel.totalAmount > 0 && viewModel.annualInterestRate > 0 {
+                                    VStack(spacing: 8) {
+                                        Divider()
+
+                                        HStack {
+                                            Text("Principal Amount")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(AppTheme.textSecondary)
+                                            Spacer()
+                                            Text(viewModel.formattedMonthlyPayment)
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundColor(AppTheme.textPrimary)
+                                        }
+
+                                        HStack {
+                                            Text("Total Interest")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(.purple)
+                                            Spacer()
+                                            if let interestText = viewModel.formattedTotalInterest {
+                                                Text(interestText)
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundColor(.purple)
+                                            }
+                                        }
+
+                                        Divider()
+
+                                        HStack {
+                                            Text("Total Cost")
+                                                .font(.system(size: 14, weight: .bold))
+                                                .foregroundColor(AppTheme.textPrimary)
+                                            Spacer()
+                                            Text(viewModel.formattedTotalCost)
+                                                .font(.system(size: 16, weight: .bold))
+                                                .foregroundColor(.purple)
+                                        }
+                                    }
+                                    .padding()
+                                    .background(Color.purple.opacity(0.1))
+                                    .cornerRadius(12)
+                                }
+                            }
+                        }
+
                         // Account & Category
                         FormSection(title: "Account & Category") {
                             Button {
