@@ -33,14 +33,27 @@ extension RecurringTransaction {
         return max(0, limit - occurrencesCount)
     }
 
-    /// Total amount paid so far
+    /// Total amount paid so far (accounts for interest if applicable)
     var paidAmount: Double {
-        return amount * Double(occurrencesCount)
+        if hasInterest && interestRate > 0 {
+            // With interest: Sum of all payments made so far
+            return amount * Double(occurrencesCount)
+        } else {
+            // No interest: Simple multiplication
+            return amount * Double(occurrencesCount)
+        }
     }
 
-    /// Remaining amount to pay
+    /// Remaining amount to pay (accounts for interest if applicable)
     var remainingAmount: Double {
-        return installmentTotalAmount - paidAmount
+        if hasInterest && interestRate > 0 {
+            // With interest: Total cost including interest minus what's been paid
+            let totalCost = calculateTotalCostWithInterest()
+            return totalCost - paidAmount
+        } else {
+            // No interest: Simple subtraction
+            return installmentTotalAmount - paidAmount
+        }
     }
 
     /// Progress percentage (0.0 to 1.0)
@@ -81,5 +94,78 @@ extension RecurringTransaction {
         let limit = occurrenceLimit
         if limit > 0 && occurrencesCount >= limit { return "green" }
         return "blue"
+    }
+
+    // MARK: - Interest Calculations
+
+    /// Calculates monthly payment with interest using amortization formula
+    /// Formula: M = P * (r * (1 + r)^n) / ((1 + r)^n - 1)
+    /// - Parameters:
+    ///   - principal: Total principal amount (e.g., $1200)
+    ///   - apr: Annual percentage rate as decimal (e.g., 0.15 for 15%)
+    ///   - months: Number of monthly payments
+    /// - Returns: Monthly payment amount
+    static func calculateMonthlyPayment(principal: Double, apr: Double, months: Int16) -> Double {
+        guard principal > 0, months > 0 else { return 0 }
+
+        // No interest case
+        if apr <= 0 {
+            return principal / Double(months)
+        }
+
+        // Calculate monthly interest rate
+        let monthlyRate = apr / 12.0
+        let n = Double(months)
+
+        // Amortization formula: M = P * (r * (1 + r)^n) / ((1 + r)^n - 1)
+        let onePlusR = 1.0 + monthlyRate
+        let numerator = principal * (monthlyRate * pow(onePlusR, n))
+        let denominator = pow(onePlusR, n) - 1.0
+
+        return numerator / denominator
+    }
+
+    /// Total cost of installment including all interest charges
+    func calculateTotalCostWithInterest() -> Double {
+        if !hasInterest || interestRate <= 0 {
+            return installmentTotalAmount
+        }
+
+        // Total cost = monthly payment × number of payments
+        let monthlyPayment = Self.calculateMonthlyPayment(
+            principal: installmentTotalAmount,
+            apr: interestRate,
+            months: occurrenceLimit
+        )
+        return monthlyPayment * Double(occurrenceLimit)
+    }
+
+    /// Total interest charges over the life of the installment
+    var totalInterestCharges: Double {
+        if !hasInterest || interestRate <= 0 {
+            return 0
+        }
+        return calculateTotalCostWithInterest() - installmentTotalAmount
+    }
+
+    /// Formatted display of APR (e.g., "15.0% APR")
+    var formattedAPR: String {
+        if !hasInterest || interestRate <= 0 {
+            return "0% APR"
+        }
+        let percentage = interestRate * 100.0
+        return String(format: "%.1f%% APR", percentage)
+    }
+
+    /// Formatted display of total interest (e.g., "+$90.00 interest")
+    var formattedTotalInterest: String? {
+        guard hasInterest, interestRate > 0 else { return nil }
+
+        let interest = totalInterestCharges
+        guard interest > 0 else { return nil }
+
+        let formatter = Formatters.currencyFormatter(for: account?.currency ?? "USD")
+        let interestStr = formatter.string(from: NSNumber(value: interest)) ?? "\(interest)"
+        return "+\(interestStr) interest"
     }
 }

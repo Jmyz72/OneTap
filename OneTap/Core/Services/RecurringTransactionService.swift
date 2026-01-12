@@ -262,6 +262,7 @@ class RecurringTransactionService {
     ///   - firstPaymentImmediate: If true, creates first payment today
     ///   - billingDay: Day of month for recurring payments (1-31, 0 = last day)
     ///   - startDate: Date when installment plan begins (used if firstPaymentImmediate = false)
+    ///   - annualInterestRate: Optional APR as decimal (e.g., 0.15 for 15% APR). Defaults to 0 (no interest)
     /// - Returns: Tuple of (RecurringTransaction plan, Optional first Transaction)
     func createInstallmentPlan(
         title: String,
@@ -274,14 +275,30 @@ class RecurringTransactionService {
         notes: String?,
         firstPaymentImmediate: Bool,
         billingDay: Int16,
-        startDate: Date = Date()
+        startDate: Date = Date(),
+        annualInterestRate: Double = 0.0
     ) async throws -> (RecurringTransaction, Transaction?) {
 
         guard numberOfPayments > 0 else {
             throw ServiceError.operationFailed("Number of payments must be greater than 0")
         }
 
-        let paymentAmount = totalAmount / Double(numberOfPayments)
+        // Calculate monthly payment with or without interest
+        let paymentAmount: Double
+        let hasInterest = annualInterestRate > 0
+
+        if hasInterest {
+            // Use amortization formula for interest-bearing installments
+            paymentAmount = RecurringTransaction.calculateMonthlyPayment(
+                principal: totalAmount,
+                apr: annualInterestRate,
+                months: numberOfPayments
+            )
+        } else {
+            // Simple division for 0% APR
+            paymentAmount = totalAmount / Double(numberOfPayments)
+        }
+
         let now = Date()
 
         // Create RecurringTransaction (the installment plan)
@@ -295,6 +312,8 @@ class RecurringTransactionService {
         plan.interval = 1
         plan.isActive = true
         plan.isInstallment = true
+        plan.hasInterest = hasInterest
+        plan.interestRate = annualInterestRate
         plan.firstPaymentImmediate = firstPaymentImmediate
         plan.occurrenceLimit = numberOfPayments
         plan.occurrencesCount = 0
