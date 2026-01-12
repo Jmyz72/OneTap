@@ -160,4 +160,21 @@ final class DependencyContainer: ObservableObject {
             validationService: validationService
         )
     }
+
+    func makeInstallmentDetailViewModel(plan: RecurringTransaction) -> InstallmentDetailViewModel {
+        InstallmentDetailViewModel(
+            plan: plan,
+            transactionRepository: transactionRepository,
+            recurringTransactionService: recurringTransactionService
+        )
+    }
+
+    func makeAddInstallmentPlanViewModel() -> AddInstallmentPlanViewModel {
+        AddInstallmentPlanViewModel(
+            recurringTransactionService: recurringTransactionService,
+            accountRepository: accountRepository,
+            categoryRepository: categoryRepository,
+            validationService: validationService
+        )
+    }
 }

@@ -82,33 +82,53 @@ extension Transaction {
 
     /// Returns formatted installment label (e.g., "Payment 3/12")
     var installmentLabel: String? {
-        guard let planID = installmentPlanID,
-              let plan = recurringTransaction,
-              plan.id == planID else {
-            return nil
+        guard let planID = installmentPlanID else { return nil }
+
+        // Try to get plan from relationship first
+        var plan = recurringTransaction
+
+        // If relationship is nil, fetch it directly
+        if plan == nil || plan?.id != planID {
+            guard let context = managedObjectContext else { return nil }
+            let request: NSFetchRequest<RecurringTransaction> = RecurringTransaction.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", planID as CVarArg)
+            request.fetchLimit = 1
+            plan = try? context.fetch(request).first
         }
+
+        guard let validPlan = plan else { return nil }
 
         let number = installmentNumber ?? 0
         guard number > 0 else { return nil }
 
-        let limit = plan.occurrenceLimit ?? 0
+        let limit = validPlan.occurrenceLimit ?? 0
         return "Payment \(number)/\(limit)"
     }
 
     /// Returns formatted installment detail (e.g., "3 of 12 • $900 remaining")
     var installmentDetail: String? {
-        guard let planID = installmentPlanID,
-              let plan = recurringTransaction,
-              plan.id == planID else {
-            return nil
+        guard let planID = installmentPlanID else { return nil }
+
+        // Try to get plan from relationship first
+        var plan = recurringTransaction
+
+        // If relationship is nil, fetch it directly
+        if plan == nil || plan?.id != planID {
+            guard let context = managedObjectContext else { return nil }
+            let request: NSFetchRequest<RecurringTransaction> = RecurringTransaction.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", planID as CVarArg)
+            request.fetchLimit = 1
+            plan = try? context.fetch(request).first
         }
 
-        let remaining = plan.remainingAmount
+        guard let validPlan = plan else { return nil }
+
+        let remaining = validPlan.remainingAmount
         let code = account?.currency ?? SettingsManager.shared.currencyCode
         let formatter = Formatters.currencyFormatter(for: code)
         let remainingStr = formatter.string(from: NSNumber(value: remaining)) ?? "$0"
 
-        return "\(plan.formattedProgress) • \(remainingStr) remaining"
+        return "\(validPlan.formattedProgress) • \(remainingStr) remaining"
     }
 }
 
