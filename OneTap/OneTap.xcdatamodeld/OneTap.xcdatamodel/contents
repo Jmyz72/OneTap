@@ -59,6 +59,9 @@
         <relationship name="subCategory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SubCategory" inverseName="recurringTransactions" inverseEntity="SubCategory"/>
         <relationship name="toAccount" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="toAccountRecurringTransactions" inverseEntity="Account"/>
         <relationship name="transactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Transaction" inverseName="recurringTransaction" inverseEntity="Transaction"/>
+        <fetchIndex name="byNextRunDate">
+            <fetchIndexElement property="nextRunDate" type="Binary" order="ascending"/>
+        </fetchIndex>
     </entity>
     <entity name="RecurringTransactionItem" representedClassName="RecurringTransactionItem" syncable="YES" codeGenerationType="class">
         <attribute name="amount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
@@ -98,6 +101,12 @@
         <relationship name="items" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="TransactionItem" inverseName="transaction" inverseEntity="TransactionItem"/>
         <relationship name="recurringTransaction" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="transactions" inverseEntity="RecurringTransaction"/>
         <relationship name="subCategory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SubCategory" inverseName="transactions" inverseEntity="SubCategory"/>
+        <fetchIndex name="byDate">
+            <fetchIndexElement property="date" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="byAccount">
+            <fetchIndexElement property="account" type="Binary" order="ascending"/>
+        </fetchIndex>
     </entity>
     <entity name="TransactionItem" representedClassName="TransactionItem" syncable="YES" codeGenerationType="class">
         <attribute name="amount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
