@@ -380,4 +380,149 @@ class RecurringTransactionService {
 
         return billingDate
     }
+
+    // MARK: - Installment Management
+
+    /// Pay off remaining installment balance early
+    /// - Parameters:
+    ///   - plan: The installment plan to pay off
+    ///   - date: Date of the payoff transaction
+    /// - Returns: Transaction for the payoff amount
+    func payOffInstallmentEarly(plan: RecurringTransaction, date: Date = Date()) async throws -> Transaction {
+        guard plan.isInstallment else {
+            throw ServiceError.operationFailed("This is not an installment plan")
+        }
+
+        guard plan.isActive else {
+            throw ServiceError.operationFailed("This installment plan is already inactive")
+        }
+
+        guard let account = plan.account else {
+            throw ServiceError.operationFailed("Account not found for installment plan")
+        }
+
+        let remainingAmount = plan.remainingAmount
+        guard remainingAmount > 0 else {
+            throw ServiceError.operationFailed("No remaining balance to pay off")
+        }
+
+        // Create final payoff transaction
+        let payoffTransaction = try transactionRepository.createTransaction(
+            title: "\(plan.title ?? "Installment") - Early Payoff",
+            amount: remainingAmount,
+            type: .expense,
+            date: date,
+            account: account,
+            category: plan.category,
+            subCategory: plan.subCategory,
+            merchant: plan.merchant,
+            notes: "Early payoff of installment plan"
+        )
+
+        payoffTransaction.recurringTransaction = plan
+        payoffTransaction.installmentPlanID = plan.id
+        payoffTransaction.installmentNumber = plan.occurrencesCount + 1
+
+        // Mark plan as completed
+        plan.isActive = false
+        plan.occurrencesCount = plan.occurrenceLimit ?? 0
+        plan.lastRunDate = date
+        plan.updatedAt = Date()
+
+        try context.save()
+
+        // Recalculate balance
+        try await balanceService.recalculateBalances(for: account.objectID, from: date)
+
+        return payoffTransaction
+    }
+
+    /// Cancel an installment plan (e.g., item returned)
+    /// - Parameters:
+    ///   - plan: The installment plan to cancel
+    ///   - refundAmount: Optional amount to refund (0 = no refund, nil = full refund of paid amount)
+    ///   - date: Date of cancellation
+    /// - Returns: Optional refund transaction if refundAmount > 0
+    func cancelInstallmentPlan(
+        plan: RecurringTransaction,
+        refundAmount: Double? = nil,
+        date: Date = Date()
+    ) async throws -> Transaction? {
+        guard plan.isInstallment else {
+            throw ServiceError.operationFailed("This is not an installment plan")
+        }
+
+        guard let account = plan.account else {
+            throw ServiceError.operationFailed("Account not found for installment plan")
+        }
+
+        // Deactivate the plan
+        plan.isActive = false
+        plan.updatedAt = Date()
+
+        var refundTransaction: Transaction? = nil
+
+        // Handle refund if requested
+        if let refund = refundAmount, refund > 0 {
+            // Create refund transaction (income to account)
+            refundTransaction = try transactionRepository.createTransaction(
+                title: "\(plan.title ?? "Installment") - Refund",
+                amount: refund,
+                type: .income,
+                date: date,
+                account: account,
+                category: plan.category,
+                subCategory: plan.subCategory,
+                merchant: plan.merchant,
+                notes: "Refund from cancelled installment plan"
+            )
+
+            refundTransaction?.recurringTransaction = plan
+        } else if refundAmount == nil {
+            // Full refund of all paid amounts
+            let paidAmount = plan.paidAmount
+            if paidAmount > 0 {
+                refundTransaction = try transactionRepository.createTransaction(
+                    title: "\(plan.title ?? "Installment") - Full Refund",
+                    amount: paidAmount,
+                    type: .income,
+                    date: date,
+                    account: account,
+                    category: plan.category,
+                    subCategory: plan.subCategory,
+                    merchant: plan.merchant,
+                    notes: "Full refund from cancelled installment plan"
+                )
+
+                refundTransaction?.recurringTransaction = plan
+            }
+        }
+
+        try context.save()
+
+        // Recalculate balance if refund was issued
+        if refundTransaction != nil {
+            try await balanceService.recalculateBalances(for: account.objectID, from: date)
+        }
+
+        return refundTransaction
+    }
+
+    /// Fetch all active installment plans
+    func fetchActiveInstallmentPlans() throws -> [RecurringTransaction] {
+        let request: NSFetchRequest<RecurringTransaction> = RecurringTransaction.fetchRequest()
+        request.predicate = NSPredicate(format: "isInstallment == YES AND isActive == YES")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \RecurringTransaction.startDate, ascending: false)]
+
+        return try context.fetch(request)
+    }
+
+    /// Fetch all installment plans (active and inactive)
+    func fetchAllInstallmentPlans() throws -> [RecurringTransaction] {
+        let request: NSFetchRequest<RecurringTransaction> = RecurringTransaction.fetchRequest()
+        request.predicate = NSPredicate(format: "isInstallment == YES")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \RecurringTransaction.startDate, ascending: false)]
+
+        return try context.fetch(request)
+    }
 }

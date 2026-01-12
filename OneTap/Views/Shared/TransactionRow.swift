@@ -87,7 +87,22 @@ struct TransactionRow: View {
                     .gradientForeground(amountGradient)
 
                 HStack(spacing: 4) {
-                    if transaction.recurringTransaction != nil {
+                    // Installment badge (priority over recurring)
+                    if transaction.isPartOfInstallment, let label = transaction.installmentLabel {
+                        HStack(spacing: 3) {
+                            Image(systemName: "creditcard.fill")
+                                .font(.system(size: 8, weight: .bold))
+                            Text(label)
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color.orange)
+                        )
+                    } else if transaction.recurringTransaction != nil {
                         Image(systemName: "repeat")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(AppTheme.accent)
