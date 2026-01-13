@@ -168,4 +168,29 @@ extension RecurringTransaction {
         let interestStr = formatter.string(from: NSNumber(value: interest)) ?? "\(interest)"
         return "+\(interestStr) interest"
     }
+
+    // MARK: - General Helpers
+
+    /// Transaction type enum
+    var typeEnum: TransactionType {
+        return TransactionType(rawValue: type ?? "Expense") ?? .expense
+    }
+
+    /// Formatted amount with currency symbol and +/- prefix
+    var formattedAmount: String {
+        let currencyCode = account?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: currencyCode)
+        let formatted = formatter.string(from: NSNumber(value: amount)) ?? "$\(amount)"
+
+        switch typeEnum {
+        case .expense:
+            return "-\(formatted)"
+        case .income:
+            return "+\(formatted)"
+        case .transfer:
+            return formatted
+        case .adjustment:
+            return formatted
+        }
+    }
 }

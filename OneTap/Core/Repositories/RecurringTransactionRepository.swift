@@ -94,6 +94,21 @@ class RecurringTransactionRepository: BaseRepository {
         return recurring
     }
 
+    // MARK: - Fetch Operations
+
+    func fetch(predicate: NSPredicate? = nil, sortDescriptors: [NSSortDescriptor] = []) -> [RecurringTransaction] {
+        let request: NSFetchRequest<RecurringTransaction> = RecurringTransaction.fetchRequest()
+        request.predicate = predicate
+        request.sortDescriptors = sortDescriptors
+
+        do {
+            return try context.fetch(request)
+        } catch {
+            print("Error fetching recurring transactions: \(error)")
+            return []
+        }
+    }
+
     func save() throws {
         if context.hasChanges {
             try context.save()

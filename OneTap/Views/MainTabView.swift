@@ -94,14 +94,7 @@ struct AccountsTab: View {
 // MARK: - Home Tab
 struct HomeTab: View {
     var body: some View {
-        NavigationStack {
-            ContentUnavailableView(
-                "Home Coming Soon",
-                systemImage: "house.fill",
-                description: Text("Home dashboard is under development")
-            )
-            .navigationTitle("Home")
-        }
+        HomeView()
     }
 }
 
