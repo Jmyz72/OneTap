@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 struct SplitTransactionSheet: View {
     @Binding var items: [SplitItemData]

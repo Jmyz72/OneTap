@@ -4,7 +4,7 @@
 //
 
 import Foundation
-internal import CoreData
+@preconcurrency internal import CoreData
 
 class RecurringTransactionService {
     private let context: NSManagedObjectContext
@@ -74,7 +74,7 @@ class RecurringTransactionService {
             // Check if requires confirmation
             if recurring.requiresConfirmation {
                 // Create pending transaction for user approval
-                let pending = try pendingRecurringRepository.createPending(
+                _ = try pendingRecurringRepository.createPending(
                     from: recurring,
                     scheduledDate: nextDate
                 )
@@ -222,7 +222,7 @@ class RecurringTransactionService {
                 // CRITICAL FIX: For dates like "monthly on 31st", always use last day
                 // to avoid drift (Feb 28 → March 28 → April 28 bug)
 
-                var monthsToAdd = interval
+                let monthsToAdd = interval
                 var components = calendar.dateComponents([.year, .month, .day], from: date)
 
                 // Add the specified number of months

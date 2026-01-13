@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
-internal import CoreData
+@preconcurrency internal import CoreData
 
 @MainActor
 class HomeViewModel: ObservableObject, ViewModelProtocol {
@@ -110,30 +110,25 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     func refreshData() async {
         loadingState = .loading
 
-        do {
-            // Calculate account balances
-            calculateAccountBalances()
+        // Calculate account balances
+        calculateAccountBalances()
 
-            // Get this month's income and expenses
-            calculateMonthlyTotals()
+        // Get this month's income and expenses
+        calculateMonthlyTotals()
 
-            // Get recent transactions
-            fetchRecentTransactions()
+        // Get recent transactions
+        fetchRecentTransactions()
 
-            // Check budget alerts
-            checkBudgetAlerts()
+        // Check budget alerts
+        checkBudgetAlerts()
 
-            // Get upcoming recurring transactions
-            fetchUpcomingRecurring()
+        // Get upcoming recurring transactions
+        fetchUpcomingRecurring()
 
-            // Get pending recurring transactions
-            fetchPendingRecurring()
+        // Get pending recurring transactions
+        fetchPendingRecurring()
 
-            loadingState = .loaded
-        } catch {
-            loadingState = .error(error.localizedDescription)
-            errorMessage = error.localizedDescription
-        }
+        loadingState = .loaded
     }
 
     // MARK: - Private Helpers

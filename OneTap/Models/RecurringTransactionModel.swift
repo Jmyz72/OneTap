@@ -6,7 +6,7 @@
 //
 
 import Foundation
-internal import CoreData
+@preconcurrency internal import CoreData
 
 extension RecurringTransaction {
 

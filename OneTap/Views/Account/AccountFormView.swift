@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 struct AccountFormView: View {
     @EnvironmentObject private var container: DependencyContainer

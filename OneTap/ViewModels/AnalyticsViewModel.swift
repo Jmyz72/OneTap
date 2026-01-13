@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
-internal import CoreData
+@preconcurrency internal import CoreData
 
 @MainActor
 class AnalyticsViewModel: ObservableObject, ViewModelProtocol {
@@ -81,34 +81,29 @@ class AnalyticsViewModel: ObservableObject, ViewModelProtocol {
     func refreshAnalytics() async {
         loadingState = .loading
 
-        do {
-            let (startDate, endDate) = selectedPeriod.dateRange
+        let (startDate, endDate) = selectedPeriod.dateRange
 
-            // Fetch all transactions in the period
-            let predicate = NSPredicate(
-                format: "date >= %@ AND date <= %@",
-                startDate as NSDate,
-                endDate as NSDate
-            )
-            let sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
-            let transactions = transactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
+        // Fetch all transactions in the period
+        let predicate = NSPredicate(
+            format: "date >= %@ AND date <= %@",
+            startDate as NSDate,
+            endDate as NSDate
+        )
+        let sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
+        let transactions = transactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
 
-            // Calculate totals
-            calculateTotals(from: transactions)
+        // Calculate totals
+        calculateTotals(from: transactions)
 
-            // Calculate category breakdown
-            calculateCategoryBreakdown(from: transactions)
+        // Calculate category breakdown
+        calculateCategoryBreakdown(from: transactions)
 
-            // Calculate monthly trends (for year view)
-            if selectedPeriod == .thisYear {
-                calculateMonthlyTrends(from: transactions)
-            }
-
-            loadingState = .loaded
-        } catch {
-            loadingState = .error(error.localizedDescription)
-            errorMessage = error.localizedDescription
+        // Calculate monthly trends (for year view)
+        if selectedPeriod == .thisYear {
+            calculateMonthlyTrends(from: transactions)
         }
+
+        loadingState = .loaded
     }
 
     func selectPeriod(_ period: TimePeriod) async {
@@ -170,7 +165,6 @@ class AnalyticsViewModel: ObservableObject, ViewModelProtocol {
     }
 
     private func calculateMonthlyTrends(from transactions: [Transaction]) {
-        let calendar = Calendar.current
         var monthlyData: [String: (income: Double, expense: Double)] = [:]
 
         for transaction in transactions {
