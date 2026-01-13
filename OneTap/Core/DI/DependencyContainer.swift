@@ -23,12 +23,14 @@ final class DependencyContainer: ObservableObject {
     let accountRepository: AccountRepository
     let categoryRepository: CategoryRepository
     let recurringTransactionRepository: RecurringTransactionRepository
+    let budgetRepository: BudgetRepository
 
     // MARK: - Services
     let balanceService: BalanceService
     let transferService: TransferService
     let validationService: ValidationService
     let recurringTransactionService: RecurringTransactionService
+    let budgetService: BudgetService
 
     init(persistenceController: PersistenceController? = nil) {
         let pc = persistenceController ?? PersistenceController.shared
@@ -40,6 +42,7 @@ final class DependencyContainer: ObservableObject {
         self.accountRepository = AccountRepository(context: context)
         self.categoryRepository = CategoryRepository(context: context)
         self.recurringTransactionRepository = RecurringTransactionRepository(context: context)
+        self.budgetRepository = BudgetRepository(context: context)
 
         // Initialize services
         self.balanceService = BalanceService(container: pc.container)
@@ -52,6 +55,10 @@ final class DependencyContainer: ObservableObject {
             context: context,
             transactionRepository: transactionRepository,
             balanceService: balanceService
+        )
+        self.budgetService = BudgetService(
+            budgetRepository: budgetRepository,
+            transactionRepository: transactionRepository
         )
     }
 
@@ -66,8 +73,17 @@ final class DependencyContainer: ObservableObject {
             recurringTransactionService: recurringTransactionService,
             transferService: transferService,
             balanceService: balanceService,
-            validationService: validationService
+            validationService: validationService,
+            budgetService: budgetService
         )
+    }
+
+    func makeBudgetListViewModel() -> BudgetListViewModel {
+        BudgetListViewModel(budgetRepository: budgetRepository)
+    }
+
+    func makeBudgetFormViewModel(budget: Budget? = nil) -> BudgetFormViewModel {
+        BudgetFormViewModel(budgetRepository: budgetRepository, budget: budget)
     }
 
     func makeEditTransactionViewModel(transaction: Transaction) -> EditTransactionViewModel {
@@ -176,5 +192,9 @@ final class DependencyContainer: ObservableObject {
             categoryRepository: categoryRepository,
             validationService: validationService
         )
+    }
+
+    func makeAnalyticsViewModel() -> AnalyticsViewModel {
+        AnalyticsViewModel(transactionRepository: transactionRepository)
     }
 }
