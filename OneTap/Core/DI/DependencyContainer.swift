@@ -197,4 +197,13 @@ final class DependencyContainer: ObservableObject {
     func makeAnalyticsViewModel() -> AnalyticsViewModel {
         AnalyticsViewModel(transactionRepository: transactionRepository)
     }
+
+    func makeHomeViewModel() -> HomeViewModel {
+        HomeViewModel(
+            accountRepository: accountRepository,
+            transactionRepository: transactionRepository,
+            budgetRepository: budgetRepository,
+            recurringTransactionRepository: recurringTransactionRepository
+        )
+    }
 }
