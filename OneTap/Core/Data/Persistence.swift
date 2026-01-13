@@ -213,7 +213,7 @@ class PersistenceController {
         
         await container.viewContext.perform {
             // Entities to delete (order matters less for cascade, but good practice)
-            let entities = ["TransactionItem", "Transaction", "Account", "SubCategory", "Category"]
+            let entities = ["Budget", "TransactionItem", "Transaction", "Account", "SubCategory", "Category"]
             
             for entityName in entities {
                 let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: entityName)
