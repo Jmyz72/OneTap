@@ -137,7 +137,9 @@ class AccountFormViewModel: ObservableObject, ViewModelProtocol {
                         account: existingAccount,
                         category: nil,
                         subCategory: nil,
-                        notes: nil
+                        merchant: nil,
+                        notes: nil,
+                        adjustmentReason: "Manual balance correction from \(SettingsManager.shared.currencyCode) \(String(format: "%.2f", existingAccount.balance)) to \(SettingsManager.shared.currencyCode) \(String(format: "%.2f", balanceValue))"
                     )
 
                     try transactionRepository.save()
@@ -183,7 +185,9 @@ class AccountFormViewModel: ObservableObject, ViewModelProtocol {
                         account: newAccount,
                         category: nil,
                         subCategory: nil,
-                        notes: nil
+                        merchant: nil,
+                        notes: nil,
+                        adjustmentReason: "Initial account balance when account was created"
                     )
 
                     try transactionRepository.save()
