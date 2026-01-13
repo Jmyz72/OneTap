@@ -349,6 +349,24 @@ private struct AddRecurringTransactionContent: View {
                     }
                     .padding()
                 }
+
+                Divider().padding(.leading, 16)
+
+                // Requires Confirmation Toggle
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Requires Confirmation")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.textPrimary)
+                        Text("Manually approve each transaction")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $viewModel.requiresConfirmation)
+                        .labelsHidden()
+                }
+                .padding()
             }
             .background(AppTheme.cardBackground)
             .cornerRadius(12)

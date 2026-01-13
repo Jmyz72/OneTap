@@ -23,6 +23,7 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     @Published var recentTransactions: [Transaction] = []
     @Published var budgetAlerts: [BudgetAlert] = []
     @Published var upcomingRecurring: [RecurringTransaction] = []
+    @Published var pendingRecurringTransactions: [PendingRecurringTransaction] = []
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -33,18 +34,21 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     private let transactionRepository: TransactionRepository
     private let budgetRepository: BudgetRepository
     private let recurringTransactionRepository: RecurringTransactionRepository
+    private let pendingRecurringRepository: PendingRecurringRepository
     private var cancellables = Set<AnyCancellable>()
 
     init(
         accountRepository: AccountRepository,
         transactionRepository: TransactionRepository,
         budgetRepository: BudgetRepository,
-        recurringTransactionRepository: RecurringTransactionRepository
+        recurringTransactionRepository: RecurringTransactionRepository,
+        pendingRecurringRepository: PendingRecurringRepository
     ) {
         self.accountRepository = accountRepository
         self.transactionRepository = transactionRepository
         self.budgetRepository = budgetRepository
         self.recurringTransactionRepository = recurringTransactionRepository
+        self.pendingRecurringRepository = pendingRecurringRepository
 
         setupObservers()
         Task {
@@ -121,6 +125,9 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
 
             // Get upcoming recurring transactions
             fetchUpcomingRecurring()
+
+            // Get pending recurring transactions
+            fetchPendingRecurring()
 
             loadingState = .loaded
         } catch {
@@ -244,6 +251,43 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
 
         let recurring = recurringTransactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
         upcomingRecurring = Array(recurring.prefix(5))
+    }
+
+    private func fetchPendingRecurring() {
+        let sortDescriptors = [NSSortDescriptor(keyPath: \PendingRecurringTransaction.scheduledDate, ascending: true)]
+        let pending = pendingRecurringRepository.fetch(sortDescriptors: sortDescriptors)
+        pendingRecurringTransactions = Array(pending.prefix(10))
+    }
+
+    var hasPendingRecurring: Bool {
+        !pendingRecurringTransactions.isEmpty
+    }
+
+    func approvePendingTransaction(_ pending: PendingRecurringTransaction) async {
+        do {
+            _ = try pendingRecurringRepository.approve(pending)
+            try pendingRecurringRepository.save()
+
+            // Update recurring transaction occurrence count if it has one
+            if let recurring = pending.recurringTransaction {
+                recurring.occurrencesCount += 1
+                recurring.lastRunDate = pending.scheduledDate
+            }
+
+            // Refresh data
+            await refreshData()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func rejectPendingTransaction(_ pending: PendingRecurringTransaction) async {
+        do {
+            try pendingRecurringRepository.delete(pending)
+            await refreshData()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func formatCurrency(_ amount: Double) -> String {

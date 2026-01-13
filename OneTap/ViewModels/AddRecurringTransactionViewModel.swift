@@ -33,6 +33,7 @@ class AddRecurringTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var endDate: Date?
     @Published var selectedWeekdays: Set<Int> = [] // 1=Sunday, 2=Monday, etc.
     @Published var selectedMonthDay: Int = 1 // 0=Last Day, 1-31=Specific day
+    @Published var requiresConfirmation = false // User must approve each transaction
     let frequencies = ["Daily", "Weekly", "Monthly", "Yearly"]
 
     // Data from repositories
@@ -251,6 +252,9 @@ class AddRecurringTransactionViewModel: ObservableObject, ViewModelProtocol {
                 weeklyDays: weeklyDaysString,
                 monthlyDay: monthlyDayValue
             )
+
+            // Set confirmation requirement
+            recurring.requiresConfirmation = requiresConfirmation
 
             // Add split items if present
             if !splitItems.isEmpty {
