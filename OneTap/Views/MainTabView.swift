@@ -9,9 +9,7 @@ import SwiftUI
 @preconcurrency internal import CoreData
 
 struct MainTabView: View {
-    @State private var selectedTab = 0
-    @State private var previousTab = 0
-    @State private var showingScanReceipt = false
+    @State private var selectedTab = 2 // Start on Home (center tab)
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -27,39 +25,25 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
-            // Add Tab (Acts as a button)
-            Color.clear
-                .tabItem {
-                    Label("Add", systemImage: "plus.circle.fill")
-                }
-                .tag(2)
-
             HomeTab()
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
+                }
+                .tag(2)
+
+            BudgetsTab()
+                .tabItem {
+                    Label("Budgets", systemImage: "chart.bar.fill")
                 }
                 .tag(3)
 
             AnalyticsTab()
                 .tabItem {
-                    Label("Analytics", systemImage: "chart.bar.fill")
+                    Label("Analytics", systemImage: "chart.xyaxis.line")
                 }
                 .tag(4)
         }
         .accentColor(AppTheme.accent)
-        .onChange(of: selectedTab, initial: false) { oldValue, newValue in
-            if newValue == 2 {
-                // If "Add" tab is tapped, show sheet and revert tab
-                showingScanReceipt = true
-                selectedTab = oldValue
-            } else {
-                // Otherwise update the tracker
-                previousTab = newValue
-            }
-        }
-        .sheet(isPresented: $showingScanReceipt) {
-            ScanReceiptView()
-        }
         .preferredColorScheme(.dark)
         .onAppear {
             setupTabBarAppearance()
@@ -95,6 +79,15 @@ struct AccountsTab: View {
 struct HomeTab: View {
     var body: some View {
         HomeView()
+    }
+}
+
+// MARK: - Budgets Tab
+struct BudgetsTab: View {
+    var body: some View {
+        NavigationStack {
+            BudgetListView()
+        }
     }
 }
 
