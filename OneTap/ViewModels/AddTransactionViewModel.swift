@@ -55,6 +55,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     private let transferService: TransferService
     private let balanceService: BalanceService
     private let validationService: ValidationService
+    private let budgetService: BudgetService? // Optional for now to avoid breaking changes if not fully wired
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -65,7 +66,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         recurringTransactionService: RecurringTransactionService,
         transferService: TransferService,
         balanceService: BalanceService,
-        validationService: ValidationService
+        validationService: ValidationService,
+        budgetService: BudgetService? = nil
     ) {
         self.transactionRepository = transactionRepository
         self.accountRepository = accountRepository
@@ -75,6 +77,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         self.transferService = transferService
         self.balanceService = balanceService
         self.validationService = validationService
+        self.budgetService = budgetService
 
         observeData()
         setupDefaults()
@@ -334,6 +337,11 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
 
                     // Recalculate balance
                     try await balanceService.recalculateBalances(for: account.objectID, from: transactionDate)
+
+                    // Update budgets
+                    if let budgetService = budgetService {
+                        try await budgetService.updateBudgetsAfterTransaction(transaction)
+                    }
                 }
             }
 
