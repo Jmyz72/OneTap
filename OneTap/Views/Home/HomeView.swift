@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var viewModel: HomeViewModel?
     @State private var showingAddTransaction = false
     @State private var showingAddAccount = false
+    @State private var showingScanReceipt = false
 
     var body: some View {
         Group {
@@ -19,7 +20,8 @@ struct HomeView: View {
                 HomeContent(
                     viewModel: viewModel,
                     showingAddTransaction: $showingAddTransaction,
-                    showingAddAccount: $showingAddAccount
+                    showingAddAccount: $showingAddAccount,
+                    showingScanReceipt: $showingScanReceipt
                 )
             } else {
                 ProgressView()
@@ -36,6 +38,9 @@ struct HomeView: View {
         .sheet(isPresented: $showingAddAccount) {
             AddAccountView(isPresented: $showingAddAccount)
         }
+        .sheet(isPresented: $showingScanReceipt) {
+            ScanReceiptView()
+        }
     }
 }
 
@@ -45,6 +50,7 @@ private struct HomeContent: View {
     @ObservedObject var viewModel: HomeViewModel
     @Binding var showingAddTransaction: Bool
     @Binding var showingAddAccount: Bool
+    @Binding var showingScanReceipt: Bool
 
     var body: some View {
         NavigationStack {
@@ -157,12 +163,12 @@ private struct HomeContent: View {
                     showingAddAccount = true
                 }
 
-                NavigationLink(destination: BudgetListView()) {
-                    QuickActionCardLink(
-                        title: "View Budgets",
-                        icon: "chart.pie.fill",
-                        color: .purple
-                    )
+                QuickActionCard(
+                    title: "Scan Receipt",
+                    icon: "camera.viewfinder",
+                    color: .purple
+                ) {
+                    showingScanReceipt = true
                 }
 
                 NavigationLink(destination: AnalyticsView()) {
