@@ -42,7 +42,7 @@ class BudgetListViewModel: ObservableObject, ViewModelProtocol {
     func deleteBudget(_ budget: Budget) async {
         loadingState = .loading
         do {
-            try await budgetRepository.delete(budget)
+            try budgetRepository.delete(budget)
             loadingState = .loaded
         } catch {
             loadingState = .error(error.localizedDescription)
@@ -54,7 +54,7 @@ class BudgetListViewModel: ObservableObject, ViewModelProtocol {
         loadingState = .loading
         do {
             for budget in budgets {
-                try await budgetRepository.recalculateSpent(for: budget)
+                try budgetRepository.recalculateSpent(for: budget)
             }
             loadingState = .loaded
         } catch {

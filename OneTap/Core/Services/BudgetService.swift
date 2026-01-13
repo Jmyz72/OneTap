@@ -32,12 +32,12 @@ class BudgetService: BudgetServiceProtocol {
         }
 
         // Find active budget for this category and date
-        guard let budget = try await budgetRepository.fetchActive(for: category, on: date) else {
+        guard let budget = try budgetRepository.fetchActive(for: category, on: date) else {
             return .noBudget
         }
 
         // Recalculate to get latest spending
-        try await budgetRepository.recalculateSpent(for: budget)
+        try budgetRepository.recalculateSpent(for: budget)
 
         if budget.isExceeded {
             return .exceeded(budget)
@@ -52,8 +52,8 @@ class BudgetService: BudgetServiceProtocol {
         guard let category = transaction.category,
               let date = transaction.date else { return }
 
-        if let budget = try await budgetRepository.fetchActive(for: category, on: date) {
-            try await budgetRepository.recalculateSpent(for: budget)
+        if let budget = try budgetRepository.fetchActive(for: category, on: date) {
+            try budgetRepository.recalculateSpent(for: budget)
         }
     }
 }
