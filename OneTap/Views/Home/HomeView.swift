@@ -70,6 +70,11 @@ private struct HomeContent: View {
                             budgetAlertsSection
                         }
 
+                        // Pending Approvals
+                        if viewModel.hasPendingRecurring {
+                            pendingApprovalsSection
+                        }
+
                         // Upcoming Recurring
                         if viewModel.hasUpcomingRecurring {
                             upcomingRecurringSection
@@ -283,6 +288,25 @@ private struct HomeContent: View {
                     .cornerRadius(10)
                 }
             }
+        }
+    }
+
+    // MARK: - Pending Approvals
+
+    private var pendingApprovalsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Pending Approvals")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary)
+
+            VStack(spacing: 12) {
+                ForEach(viewModel.pendingRecurringTransactions, id: \.objectID) { pending in
+                    PendingRecurringRow(pending: pending, viewModel: viewModel)
+                }
+            }
+            .padding(16)
+            .background(AppTheme.cardBackground)
+            .cornerRadius(12)
         }
     }
 
@@ -512,6 +536,66 @@ private struct UpcomingRecurringRow: View {
                 .foregroundColor(recurring.typeEnum == .expense ? AppTheme.expense : AppTheme.income)
         }
         .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Pending Recurring Row
+
+private struct PendingRecurringRow: View {
+    let pending: PendingRecurringTransaction
+    @ObservedObject var viewModel: HomeViewModel
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: pending.category?.iconName ?? "clock.fill")
+                .foregroundColor(pending.category?.colorView ?? .orange)
+                .frame(width: 32, height: 32)
+                .background((pending.category?.colorView ?? .orange).opacity(0.15))
+                .cornerRadius(8)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(pending.displayTitle)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppTheme.textPrimary)
+
+                Text(pending.statusText)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(pending.formattedAmount)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(pending.typeEnum == .expense ? AppTheme.expense : AppTheme.income)
+
+                Text(pending.formattedScheduledDate)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button {
+                Task {
+                    await viewModel.approvePendingTransaction(pending)
+                }
+            } label: {
+                Label("Approve", systemImage: "checkmark.circle.fill")
+            }
+            .tint(.green)
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                Task {
+                    await viewModel.rejectPendingTransaction(pending)
+                }
+            } label: {
+                Label("Reject", systemImage: "xmark.circle.fill")
+            }
+        }
     }
 }
 

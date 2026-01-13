@@ -24,6 +24,7 @@ final class DependencyContainer: ObservableObject {
     let categoryRepository: CategoryRepository
     let recurringTransactionRepository: RecurringTransactionRepository
     let budgetRepository: BudgetRepository
+    let pendingRecurringRepository: PendingRecurringRepository
 
     // MARK: - Services
     let balanceService: BalanceService
@@ -43,6 +44,7 @@ final class DependencyContainer: ObservableObject {
         self.categoryRepository = CategoryRepository(context: context)
         self.recurringTransactionRepository = RecurringTransactionRepository(context: context)
         self.budgetRepository = BudgetRepository(context: context)
+        self.pendingRecurringRepository = PendingRecurringRepository(context: context)
 
         // Initialize services
         self.balanceService = BalanceService(container: pc.container)
@@ -54,7 +56,8 @@ final class DependencyContainer: ObservableObject {
         self.recurringTransactionService = RecurringTransactionService(
             context: context,
             transactionRepository: transactionRepository,
-            balanceService: balanceService
+            balanceService: balanceService,
+            pendingRecurringRepository: pendingRecurringRepository
         )
         self.budgetService = BudgetService(
             budgetRepository: budgetRepository,
@@ -203,7 +206,8 @@ final class DependencyContainer: ObservableObject {
             accountRepository: accountRepository,
             transactionRepository: transactionRepository,
             budgetRepository: budgetRepository,
-            recurringTransactionRepository: recurringTransactionRepository
+            recurringTransactionRepository: recurringTransactionRepository,
+            pendingRecurringRepository: pendingRecurringRepository
         )
     }
 }

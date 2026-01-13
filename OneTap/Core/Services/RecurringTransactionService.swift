@@ -10,11 +10,13 @@ class RecurringTransactionService {
     private let context: NSManagedObjectContext
     private let transactionRepository: TransactionRepository
     private let balanceService: BalanceService
+    private let pendingRecurringRepository: PendingRecurringRepository
 
-    init(context: NSManagedObjectContext, transactionRepository: TransactionRepository, balanceService: BalanceService) {
+    init(context: NSManagedObjectContext, transactionRepository: TransactionRepository, balanceService: BalanceService, pendingRecurringRepository: PendingRecurringRepository) {
         self.context = context
         self.transactionRepository = transactionRepository
         self.balanceService = balanceService
+        self.pendingRecurringRepository = pendingRecurringRepository
     }
 
     /// Processes all active recurring transactions and generates missing occurrences
@@ -69,7 +71,29 @@ class RecurringTransactionService {
                 break
             }
 
-            // Generate actual transaction
+            // Check if requires confirmation
+            if recurring.requiresConfirmation {
+                // Create pending transaction for user approval
+                let pending = try pendingRecurringRepository.createPending(
+                    from: recurring,
+                    scheduledDate: nextDate
+                )
+
+                // Note: We don't increment occurrencesCount here - it will be incremented when approved
+                // Still update the nextRunDate to check for next pending transaction
+                if let calculatedNext = calculateNextDate(for: recurring, from: nextDate) {
+                    nextDate = calculatedNext
+                    recurring.nextRunDate = nextDate
+                } else {
+                    recurring.isActive = false
+                    break
+                }
+
+                // Continue to next iteration without incrementing occurrencesCount
+                continue
+            }
+
+            // Generate actual transaction (auto-approve mode)
             let transaction = try transactionRepository.createTransaction(
                 title: recurring.title ?? "",
                 amount: recurring.amount,
