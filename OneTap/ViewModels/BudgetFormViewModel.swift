@@ -82,8 +82,8 @@ class BudgetFormViewModel: ObservableObject, ViewModelProtocol {
                     startDate: startDate,
                     endDate: endDate
                 )
-                try await budgetRepository.update(budget, with: dto)
-                try await budgetRepository.recalculateSpent(for: budget)
+                try budgetRepository.update(budget, with: dto)
+                try budgetRepository.recalculateSpent(for: budget)
             } else {
                 // Create new
                 let dto = BudgetCreateData(
@@ -92,8 +92,8 @@ class BudgetFormViewModel: ObservableObject, ViewModelProtocol {
                     startDate: startDate,
                     endDate: endDate
                 )
-                let newBudget = try await budgetRepository.create(dto)
-                try await budgetRepository.recalculateSpent(for: newBudget)
+                let newBudget = try budgetRepository.create(dto)
+                try budgetRepository.recalculateSpent(for: newBudget)
             }
             loadingState = .loaded
         } catch {
