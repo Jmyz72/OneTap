@@ -1,5 +1,5 @@
 import Foundation
-internal import CoreData
+@preconcurrency internal import CoreData
 import Combine
 
 @MainActor

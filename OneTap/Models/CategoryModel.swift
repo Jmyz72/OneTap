@@ -5,7 +5,7 @@
 
 import Foundation
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 extension Category {
     var colorView: Color {

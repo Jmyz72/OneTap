@@ -1,5 +1,5 @@
 import Foundation
-internal import CoreData
+@preconcurrency internal import CoreData
 
 protocol BudgetServiceProtocol {
     func checkBudgetStatus(for transaction: Transaction) async throws -> BudgetStatus

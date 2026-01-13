@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 struct TransactionMiddleBar: View {
     @Binding var selectedCategory: Category?

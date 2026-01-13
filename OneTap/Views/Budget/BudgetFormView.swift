@@ -1,5 +1,5 @@
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 struct BudgetFormView: View {
     @EnvironmentObject private var container: DependencyContainer

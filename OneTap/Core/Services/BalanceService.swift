@@ -7,7 +7,7 @@
 //
 
 import Foundation
-internal import CoreData
+@preconcurrency internal import CoreData
 
 protocol BalanceServiceProtocol {
     func recalculateBalances(for accountID: NSManagedObjectID, from date: Date?) async throws

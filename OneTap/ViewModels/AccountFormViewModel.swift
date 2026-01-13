@@ -9,7 +9,7 @@
 import Foundation
 import SwiftUI
 import Combine
-internal import CoreData
+@preconcurrency internal import CoreData
 
 @MainActor
 class AccountFormViewModel: ObservableObject, ViewModelProtocol {

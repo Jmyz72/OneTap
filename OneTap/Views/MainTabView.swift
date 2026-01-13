@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 struct MainTabView: View {
     @State private var selectedTab = 0

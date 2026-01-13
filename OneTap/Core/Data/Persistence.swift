@@ -5,7 +5,7 @@
 //  Created by Jimmy Hew on 29/12/2025.
 //
 
-internal import CoreData
+@preconcurrency internal import CoreData
 
 class PersistenceController {
     static let shared = PersistenceController()

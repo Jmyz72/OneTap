@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 struct TransactionAmountDisplay: View {
     let amountString: String

@@ -1,6 +1,11 @@
+//
+//  CategoryModel.swift
+//  OneTap
+//
+
 import Foundation
 import SwiftUI
-internal import CoreData
+@preconcurrency internal import CoreData
 
 extension Budget {
     // Computed property for progress percentage

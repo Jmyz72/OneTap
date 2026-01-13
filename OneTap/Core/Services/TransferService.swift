@@ -7,7 +7,7 @@
 //
 
 import Foundation
-internal import CoreData
+@preconcurrency internal import CoreData
 
 protocol TransferServiceProtocol {
     func createTransfer(
