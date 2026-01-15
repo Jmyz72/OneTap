@@ -25,6 +25,7 @@ final class DependencyContainer: ObservableObject {
     let recurringTransactionRepository: RecurringTransactionRepository
     let budgetRepository: BudgetRepository
     let pendingRecurringRepository: PendingRecurringRepository
+    let savingsGoalRepository: SavingsGoalRepository
 
     // MARK: - Services
     let balanceService: BalanceService
@@ -45,6 +46,7 @@ final class DependencyContainer: ObservableObject {
         self.recurringTransactionRepository = RecurringTransactionRepository(context: context)
         self.budgetRepository = BudgetRepository(context: context)
         self.pendingRecurringRepository = PendingRecurringRepository(context: context)
+        self.savingsGoalRepository = SavingsGoalRepository(context: context)
 
         // Initialize services
         self.balanceService = BalanceService(container: pc.container)

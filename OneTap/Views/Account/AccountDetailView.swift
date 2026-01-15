@@ -18,6 +18,7 @@ struct AccountDetailView: View {
     // UI State (view-only state)
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
+    @State private var showingGoalSheet = false
 
     var body: some View {
         Group {
@@ -26,18 +27,14 @@ struct AccountDetailView: View {
                     AppTheme.background.ignoresSafeArea()
 
                     ScrollView {
-                        VStack(spacing: 24) {
-                            // Account Header
+                        VStack(spacing: 16) {
+                            // Account Header (includes quick actions)
                             accountHeaderCard
-
-                            // Quick Actions
-                            quickActionsCard
 
                             // Transaction History
                             transactionHistorySection
                         }
                         .padding(16)
-                        .padding(.top, 8)
                     }
                 }
                 .navigationTitle(account.name ?? "Account")
@@ -78,6 +75,12 @@ struct AccountDetailView: View {
                                 }
                             }
                     }
+                }
+                .sheet(isPresented: $showingGoalSheet) {
+                    SavingsGoalSheet(
+                        account: account,
+                        repository: container.savingsGoalRepository
+                    )
                 }
                 .alert("Delete Account", isPresented: $showingDeleteAlert) {
                     Button("Cancel", role: .cancel) { }
@@ -130,115 +133,146 @@ struct AccountDetailView: View {
         }
     }
 
-    // MARK: - Account Header
+    // MARK: - Account Header (Compact Combined Card)
 
     private var accountHeaderCard: some View {
-        VStack(spacing: 24) {
-            // Icon & Type
-            VStack(spacing: 12) {
-                AccountIconView(
-                    iconName: account.icon ?? "creditcard.fill",
-                    color: accountColor,
-                    size: 36
-                )
+        VStack(spacing: 16) {
+            // Top Row: Icon + Name | Balance
+            HStack(alignment: .top, spacing: 12) {
+                // Left: Icon + Account Info
+                HStack(spacing: 12) {
+                    AccountIconView(
+                        iconName: account.icon ?? "creditcard.fill",
+                        color: accountColor,
+                        size: 28
+                    )
 
-                Text(account.typeEnum.rawValue)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .background(AppTheme.secondaryBackground)
-                    .cornerRadius(12)
-            }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.name ?? "Account")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.textPrimary)
 
-            // Balance
-            VStack(spacing: 8) {
-                Text("Current Balance")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(AppTheme.textSecondary)
+                        HStack(spacing: 6) {
+                            Text(account.typeEnum.rawValue)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(AppTheme.textSecondary)
 
-                Text(viewModel?.formatCurrency(account.balance) ?? "")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .foregroundColor(balanceColor)
+                            if account.isLiability {
+                                Text("•")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(AppTheme.textTertiary)
 
-                if account.isLiability {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12))
-
-                        Text("Liability Account")
-                            .font(.system(size: 13, weight: .semibold))
+                                Text("Liability")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(AppTheme.expense)
+                            }
+                        }
                     }
-                    .foregroundColor(AppTheme.expense)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(AppTheme.expense.opacity(0.1))
-                    .cornerRadius(10)
+                }
+
+                Spacer()
+
+                // Right: Balance
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Balance")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.textTertiary)
+
+                    Text(viewModel?.formatCurrency(account.balance) ?? "")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(balanceColor)
                 }
             }
 
-            // Account Details
-            if account.currency != nil || account.lastFourDigits != nil {
-                Divider()
-                    .padding(.horizontal, 24)
+            // Quick Actions Row
+            HStack(spacing: 8) {
+                CompactActionButton(
+                    icon: "plus",
+                    title: "Add",
+                    color: AppTheme.income
+                ) {
+                    // TODO: Add transaction
+                }
 
-                VStack(spacing: 12) {
-                    if let currency = account.currency {
-                        DetailRow(label: "Currency", value: currency)
+                CompactActionButton(
+                    icon: account.savingsGoal != nil ? "target" : "scope",
+                    title: "Goal",
+                    color: goalButtonColor
+                ) {
+                    showingGoalSheet = true
+                }
+
+                CompactActionButton(
+                    icon: "chart.bar.fill",
+                    title: "Stats",
+                    color: AppTheme.secondaryAccent
+                ) {
+                    // TODO: Show stats
+                }
+            }
+
+            // Savings Goal Progress (if set)
+            if let goal = account.savingsGoal {
+                VStack(spacing: 6) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(AppTheme.secondaryBackground)
+                                .frame(height: 6)
+
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(goalProgressColor(goal.progress))
+                                .frame(width: geometry.size.width * goal.progressClamped, height: 6)
+                        }
                     }
+                    .frame(height: 6)
 
-                    if let last4 = account.lastFourDigits, !last4.isEmpty {
-                        DetailRow(label: "Last 4 Digits", value: "•••• \(last4)")
-                    }
+                    HStack {
+                        Text(goal.name ?? "Goal")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.textTertiary)
 
-                    if account.billingDay > 0 {
-                        DetailRow(label: "Billing Day", value: "Day \(account.billingDay)")
-                    }
+                        Spacer()
 
-                    if account.dueDay > 0 {
-                        DetailRow(label: "Payment Due", value: "Day \(account.dueDay)")
+                        Text(goal.progressSummary)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(goalProgressColor(goal.progress))
                     }
                 }
             }
         }
-        .padding(28)
+        .padding(16)
         .background(AppTheme.cardBackground)
-        .cornerRadius(24)
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.05), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.2), radius: 16, x: 0, y: 8)
     }
 
-    // MARK: - Quick Actions
+    // MARK: - Quick Actions (kept for compatibility but now using compact version above)
 
     private var quickActionsCard: some View {
-        HStack(spacing: 12) {
-            QuickActionButton(
-                icon: "plus.circle.fill",
-                title: "Add",
-                color: AppTheme.income
-            ) {
-                // TODO: Add transaction
-            }
+        EmptyView() // No longer used - actions integrated into header
+    }
 
-            QuickActionButton(
-                icon: "arrow.left.arrow.right.circle.fill",
-                title: "Transfer",
-                color: AppTheme.accent
-            ) {
-                // TODO: Transfer
-            }
-
-            QuickActionButton(
-                icon: "chart.bar.fill",
-                title: "Stats",
-                color: AppTheme.secondaryAccent
-            ) {
-                // TODO: Show stats
-            }
+    private var goalButtonColor: Color {
+        guard let goal = account.savingsGoal else { return AppTheme.accent }
+        if goal.isComplete {
+            return AppTheme.income
+        } else if goal.progress >= 0.7 {
+            return .orange
         }
+        return AppTheme.accent
+    }
+
+    private func goalProgressColor(_ progress: Double) -> Color {
+        if progress >= 1.0 {
+            return AppTheme.income
+        } else if progress >= 0.7 {
+            return .orange
+        }
+        return AppTheme.accent
     }
 
     // MARK: - Transaction History
@@ -307,9 +341,9 @@ private struct DetailRow: View {
     }
 }
 
-// MARK: - Quick Action Button
+// MARK: - Compact Action Button
 
-private struct QuickActionButton: View {
+private struct CompactActionButton: View {
     let icon: String
     let title: String
     let color: Color
@@ -317,9 +351,9 @@ private struct QuickActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 24))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(color)
 
                 Text(title)
@@ -327,13 +361,9 @@ private struct QuickActionButton: View {
                     .foregroundColor(AppTheme.textPrimary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(AppTheme.cardBackground)
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
-            )
+            .padding(.vertical, 10)
+            .background(AppTheme.secondaryBackground)
+            .cornerRadius(10)
         }
     }
 }
