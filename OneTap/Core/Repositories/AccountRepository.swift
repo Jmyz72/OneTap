@@ -30,22 +30,27 @@ class AccountRepository: BaseRepository {
         let initialAccounts = fetchAccounts(group: nil)
         let subject = CurrentValueSubject<[Account], Error>(initialAccounts)
 
-        // Observe Core Data changes (from any context, to catch BalanceService background updates)
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+        // Observe Core Data saves from any context
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
             .sink { [weak self] notification in
                 guard let self = self else { return }
 
-                // Filter: Only refetch if Account objects were actually changed
-                let changedObjects = [
-                    notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? [],
-                    notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? [],
-                    notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
-                ].flatMap { $0 }
+                // Accept saves from any context with same persistent store
+                guard let savedContext = notification.object as? NSManagedObjectContext,
+                      savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
+                    return
+                }
 
-                let hasAccountChanges = changedObjects.contains { $0 is Account }
+                // Check if Account was changed
+                let inserted = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+                let updated = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+                let deleted = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+
+                let hasAccountChanges = (inserted.union(updated).union(deleted))
+                    .contains { $0 is Account }
+
                 guard hasAccountChanges else { return }
 
-                // Only refetch when accounts actually changed
                 self.context.perform {
                     let accounts = self.fetchAccounts(group: nil)
                     subject.send(accounts)
@@ -60,10 +65,27 @@ class AccountRepository: BaseRepository {
         let initialAccount = findByID(id)
         let subject = CurrentValueSubject<Account?, Error>(initialAccount)
 
-        // Observe Core Data changes (from any context, to catch BalanceService background updates)
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: nil)
-            .sink { [weak self] _ in
+        // Observe Core Data saves from any context
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .sink { [weak self] notification in
                 guard let self = self else { return }
+
+                // Accept saves from any context with same persistent store
+                guard let savedContext = notification.object as? NSManagedObjectContext,
+                      savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
+                    return
+                }
+
+                // Check if Account was changed
+                let inserted = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+                let updated = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+                let deleted = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+
+                let hasAccountChanges = (inserted.union(updated).union(deleted))
+                    .contains { $0 is Account }
+
+                guard hasAccountChanges else { return }
+
                 let account = self.findByID(id)
                 subject.send(account)
             }

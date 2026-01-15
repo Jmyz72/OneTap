@@ -31,11 +31,28 @@ class RecurringTransactionRepository: BaseRepository {
         let initial = (try? context.fetch(request)) ?? []
         let subject = CurrentValueSubject<[RecurringTransaction], Error>(initial)
         
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
-            .sink { [weak self] _ in
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .sink { [weak self] notification in
                 guard let self = self else { return }
-                let updated = (try? self.context.fetch(request)) ?? []
-                subject.send(updated)
+
+                // Accept saves from any context with same persistent store
+                guard let savedContext = notification.object as? NSManagedObjectContext,
+                      savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
+                    return
+                }
+
+                // Check if RecurringTransaction was changed
+                let inserted = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+                let updated = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+                let deleted = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+
+                let hasChanges = (inserted.union(updated).union(deleted))
+                    .contains { $0 is RecurringTransaction }
+
+                guard hasChanges else { return }
+
+                let fetched = (try? self.context.fetch(request)) ?? []
+                subject.send(fetched)
             }
             .store(in: &cancellables)
             

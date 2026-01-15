@@ -17,6 +17,7 @@ struct TransactionDetailView: View {
 
     // UI State (view-only state)
     @State private var showingEditSheet = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         Group {
@@ -60,6 +61,8 @@ struct TransactionDetailView: View {
                                 DetailRow(label: "Account", value: transaction.account?.name ?? "None", icon: "creditcard.fill", color: .blue)
                                 Divider().padding(.leading, 50)
                                 DetailRow(label: "Date & Time", value: Formatters.dateTime.string(from: transaction.date ?? Date()), icon: "calendar", color: .red)
+                                Divider().padding(.leading, 50)
+                                DetailRow(label: "Balance After", value: transaction.formattedBalanceAfter, icon: "equal.circle.fill", color: .green)
 
                                 if let merchant = transaction.merchant {
                                     Divider().padding(.leading, 50)
@@ -68,6 +71,83 @@ struct TransactionDetailView: View {
                             }
                             .modernCardStyle()
                             .padding(.horizontal)
+
+                            // Installment Info Section (if part of installment plan)
+                            if transaction.isPartOfInstallment, let plan = transaction.recurringTransaction {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Installment Plan")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                        .padding(.horizontal)
+
+                                    NavigationLink(destination: InstallmentDetailView(plan: plan)) {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: "creditcard.fill")
+                                                .font(.system(size: 20))
+                                                .foregroundColor(.purple)
+                                                .frame(width: 36, height: 36)
+                                                .background(Color.purple.opacity(0.15))
+                                                .cornerRadius(8)
+
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                if let label = transaction.installmentLabel {
+                                                    Text(label)
+                                                        .font(.system(size: 15, weight: .semibold))
+                                                        .foregroundColor(AppTheme.textPrimary)
+                                                }
+                                                if let detail = transaction.installmentDetail {
+                                                    Text(detail)
+                                                        .font(.system(size: 13))
+                                                        .foregroundColor(AppTheme.textSecondary)
+                                                }
+                                            }
+
+                                            Spacer()
+
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundColor(AppTheme.textTertiary)
+                                        }
+                                        .padding()
+                                        .modernCardStyle()
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.horizontal)
+                                }
+                            }
+
+                            // Linked Transfer Section (if transfer type)
+                            if transaction.typeEnum == .transfer, transaction.relatedTransactionID != nil {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("Linked Transfer")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                        .padding(.horizontal)
+
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "arrow.left.arrow.right")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(.blue)
+                                            .frame(width: 36, height: 36)
+                                            .background(Color.blue.opacity(0.15))
+                                            .cornerRadius(8)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Transfer Transaction")
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundColor(AppTheme.textPrimary)
+                                            Text("This transaction is part of a transfer")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(AppTheme.textSecondary)
+                                        }
+
+                                        Spacer()
+                                    }
+                                    .padding()
+                                    .modernCardStyle()
+                                    .padding(.horizontal)
+                                }
+                            }
 
                             // Split Items Section (if any)
                             if !transaction.itemsArray.isEmpty {
@@ -148,11 +228,29 @@ struct TransactionDetailView: View {
                                 }
                             }
 
+                            // Metadata Footer (timestamps)
+                            if transaction.createdAt != nil || transaction.updatedAt != nil {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if let created = transaction.createdAt {
+                                        Text("Created \(Formatters.dateTime.string(from: created))")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(AppTheme.textTertiary)
+                                    }
+                                    if let updated = transaction.updatedAt,
+                                       let created = transaction.createdAt,
+                                       updated.timeIntervalSince(created) > 60 {
+                                        Text("Modified \(Formatters.dateTime.string(from: updated))")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(AppTheme.textTertiary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal)
+                            }
+
                             // Delete Button
                             Button {
-                                Task {
-                                    await viewModel.deleteTransaction()
-                                }
+                                showingDeleteConfirmation = true
                             } label: {
                                 HStack {
                                     Image(systemName: "trash")
@@ -201,6 +299,17 @@ struct TransactionDetailView: View {
                         Text(error)
                     }
                 }
+                // Delete confirmation
+                .alert("Delete Transaction", isPresented: $showingDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            await viewModel.deleteTransaction()
+                        }
+                    }
+                } message: {
+                    Text("Are you sure you want to delete this transaction? This cannot be undone.")
+                }
                 // MVVM: Loading overlay
                 .overlay {
                     if viewModel.loadingState.isLoading {
@@ -215,8 +324,8 @@ struct TransactionDetailView: View {
                     }
                 }
                 // MVVM: Auto-dismiss on success (after delete)
-                .onChange(of: viewModel.loadingState) { _, newState in
-                    if newState == .loaded {
+                .onChange(of: viewModel.shouldDismiss) { _, shouldDismiss in
+                    if shouldDismiss {
                         dismiss()
                     }
                 }

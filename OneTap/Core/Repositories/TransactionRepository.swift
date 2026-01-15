@@ -106,24 +106,27 @@ class TransactionRepository: BaseRepository {
             }
             .store(in: &cancellables)
 
-        // CRITICAL FIX: Also observe background context saves to catch balance recalculations
+        // Observe all context saves (view context + background contexts) to catch edits and balance recalculations
         NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
             .sink { [weak self] notification in
                 guard let self = self else { return }
 
-                // Only handle saves from background contexts, not the view context itself
+                // Handle saves from any context that shares the same persistent store
                 guard let savedContext = notification.object as? NSManagedObjectContext,
-                      savedContext !== self.context,
                       savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
                     return
                 }
 
-                // Check if any Transaction objects were updated
-                if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
-                    let hasTransactionUpdates = updatedObjects.contains { $0 is Transaction }
-                    if hasTransactionUpdates {
-                        triggerSubject.send()
-                    }
+                // Check if any Transaction objects were inserted, updated, or deleted
+                let insertedObjects = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+                let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+                let deletedObjects = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+
+                let hasTransactionChanges = (insertedObjects.union(updatedObjects).union(deletedObjects))
+                    .contains { $0 is Transaction }
+
+                if hasTransactionChanges {
+                    triggerSubject.send()
                 }
             }
             .store(in: &cancellables)

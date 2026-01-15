@@ -61,7 +61,7 @@ final class DependencyContainer: ObservableObject {
         )
         self.budgetService = BudgetService(
             budgetRepository: budgetRepository,
-            transactionRepository: transactionRepository
+            context: context
         )
     }
 
