@@ -95,6 +95,13 @@ struct AccountTransactionRow: View {
                             .foregroundColor(AppTheme.accent)
                     }
 
+                    // Excluded from reports badge
+                    if transaction.excludeFromReports {
+                        Image(systemName: "eye.slash")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppTheme.textTertiary)
+                    }
+
                     Text(Formatters.time.string(from: transaction.date ?? Date()))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(AppTheme.textTertiary)

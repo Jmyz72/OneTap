@@ -20,6 +20,7 @@ struct TransactionUpdateData {
     let subCategory: SubCategory?
     let merchant: String?
     let notes: String?
+    let excludeFromReports: Bool?
 }
 
 struct SplitItemData: Identifiable {

@@ -160,26 +160,6 @@ final class DependencyContainer: ObservableObject {
         RecurringTransactionsListViewModel(repository: recurringTransactionRepository)
     }
 
-    func makeAddRecurringTransactionViewModel() -> AddRecurringTransactionViewModel {
-        AddRecurringTransactionViewModel(
-            recurringTransactionRepository: recurringTransactionRepository,
-            accountRepository: accountRepository,
-            categoryRepository: categoryRepository,
-            recurringTransactionService: recurringTransactionService,
-            validationService: validationService
-        )
-    }
-
-    func makeEditRecurringTransactionViewModel(recurring: RecurringTransaction) -> EditRecurringTransactionViewModel {
-        EditRecurringTransactionViewModel(
-            recurring: recurring,
-            recurringTransactionRepository: recurringTransactionRepository,
-            accountRepository: accountRepository,
-            categoryRepository: categoryRepository,
-            validationService: validationService
-        )
-    }
-
     func makeInstallmentDetailViewModel(plan: RecurringTransaction) -> InstallmentDetailViewModel {
         InstallmentDetailViewModel(
             plan: plan,
@@ -207,7 +187,8 @@ final class DependencyContainer: ObservableObject {
             transactionRepository: transactionRepository,
             budgetRepository: budgetRepository,
             recurringTransactionRepository: recurringTransactionRepository,
-            pendingRecurringRepository: pendingRecurringRepository
+            pendingRecurringRepository: pendingRecurringRepository,
+            balanceService: balanceService
         )
     }
 }

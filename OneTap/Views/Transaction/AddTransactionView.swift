@@ -11,11 +11,19 @@ import SwiftUI
 struct AddTransactionView: View {
     @EnvironmentObject private var container: DependencyContainer
     @State private var viewModel: AddTransactionViewModel?
+    let autoOpenRecurring: Bool
+
+    init(autoOpenRecurring: Bool = false) {
+        self.autoOpenRecurring = autoOpenRecurring
+    }
 
     var body: some View {
         Group {
             if let viewModel {
-                AddTransactionContent(viewModel: viewModel)
+                AddTransactionContent(
+                    viewModel: viewModel,
+                    autoOpenRecurring: autoOpenRecurring
+                )
             } else {
                 ProgressView()
             }
@@ -33,6 +41,7 @@ struct AddTransactionView: View {
 private struct AddTransactionContent: View {
     @ObservedObject var viewModel: AddTransactionViewModel
     @Environment(\.dismiss) private var dismiss
+    let autoOpenRecurring: Bool
 
     // UI State for Sheets/Pickers (view-only state)
     @State private var showingDatePicker = false
@@ -42,8 +51,7 @@ private struct AddTransactionContent: View {
     @State private var showingNoteInput = false
     @State private var showingMerchantInput = false
     @State private var showingSplitSheet = false
-    @State private var showingRecurringPicker = false
-    @State private var showingRecurringConfigSheet = false
+    @State private var showingRecurringPresetSheet = false
     @State private var showingInstallmentSheet = false
 
     @FocusState private var focusedField: TransactionDetailsInput.Field?
@@ -83,33 +91,22 @@ private struct AddTransactionContent: View {
                 TextField("Note", text: $viewModel.note)
                 Button("Done") { }
             }
-            .alert("Add Merchant", isPresented: $showingMerchantInput) {
-                TextField("Merchant Name", text: $viewModel.merchant)
-                Button("Done") { }
+            .sheet(isPresented: $showingMerchantInput) {
+                MerchantPickerSheet(viewModel: viewModel)
             }
-            .confirmationDialog("Recurring Frequency", isPresented: $showingRecurringPicker, titleVisibility: .visible) {
-                ForEach(viewModel.frequencies, id: \.self) { freq in
-                    Button(freq) {
-                        viewModel.frequency = freq
-                        viewModel.isRecurring = true
-                        showingRecurringConfigSheet = true
-                    }
-                }
-                if viewModel.isRecurring {
-                    Button("Edit Configuration") {
-                        showingRecurringConfigSheet = true
-                    }
-                    Button("Remove Recurring", role: .destructive) {
-                        viewModel.isRecurring = false
-                    }
-                }
-                Button("Cancel", role: .cancel) { }
-            }
-            .sheet(isPresented: $showingRecurringConfigSheet) {
-                RecurringConfigSheet(viewModel: viewModel)
+            .sheet(isPresented: $showingRecurringPresetSheet) {
+                RecurringPresetSheet(viewModel: viewModel)
             }
             .sheet(isPresented: $showingInstallmentSheet) {
                 InstallmentConfigSheet(viewModel: viewModel)
+            }
+            .onAppear {
+                // Auto-open recurring sheet if requested (from Settings)
+                if autoOpenRecurring {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showingRecurringPresetSheet = true
+                    }
+                }
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -219,6 +216,7 @@ private struct AddTransactionContent: View {
             showInstallmentOption: viewModel.showInstallmentOption,
             installmentPayments: viewModel.installmentPayments,
             formattedInstallmentPayment: viewModel.formattedInstallmentPayment,
+            excludeFromReports: $viewModel.excludeFromReports,
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -229,8 +227,9 @@ private struct AddTransactionContent: View {
             onMerchantTap: { showingMerchantInput = true },
             onSplitTap: { showingSplitSheet = true },
             onNoteTap: { showingNoteInput = true },
-            onRecurringTap: { showingRecurringPicker = true },
-            onInstallmentTap: { showingInstallmentSheet = true }
+            onRecurringTap: { showingRecurringPresetSheet = true },
+            onInstallmentTap: { showingInstallmentSheet = true },
+            onExclusionTap: { viewModel.excludeFromReports.toggle() }
         )
     }
 
@@ -304,10 +303,11 @@ private struct AddTransactionContent: View {
 
 // MARK: - Recurring Configuration Sheet
 
-private struct RecurringConfigSheet: View {
+struct RecurringConfigSheet: View {
     @ObservedObject var viewModel: AddTransactionViewModel
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showingStartDatePicker = false
     @State private var showingEndDatePicker = false
     @State private var showingExecutionNumberInput = false
 
@@ -318,6 +318,12 @@ private struct RecurringConfigSheet: View {
 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Quick Presets
+                        quickPresetsSection
+
+                        // Start Date
+                        startDateSection
+
                         // Frequency & Interval
                         frequencySection
 
@@ -330,6 +336,9 @@ private struct RecurringConfigSheet: View {
                         } else if viewModel.frequency == "Monthly" {
                             monthDaySection
                         }
+
+                        // Approval Setting
+                        approvalSection
                     }
                     .padding(.vertical, 20)
                 }
@@ -339,9 +348,15 @@ private struct RecurringConfigSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
+                        // Mark as recurring when user completes configuration
+                        viewModel.isRecurring = true
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                 }
+            }
+            .sheet(isPresented: $showingStartDatePicker) {
+                startDatePickerSheet
             }
             .sheet(isPresented: $showingEndDatePicker) {
                 endDatePickerSheet
@@ -351,6 +366,87 @@ private struct RecurringConfigSheet: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var quickPresetsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Quick Presets")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary)
+                .textCase(.uppercase)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    QuickPresetChip(
+                        title: "Weekly",
+                        isSelected: viewModel.frequency == "Weekly" && viewModel.interval == 1
+                    ) {
+                        viewModel.frequency = "Weekly"
+                        viewModel.interval = 1
+                    }
+
+                    QuickPresetChip(
+                        title: "Bi-Weekly",
+                        isSelected: viewModel.frequency == "Weekly" && viewModel.interval == 2
+                    ) {
+                        viewModel.frequency = "Weekly"
+                        viewModel.interval = 2
+                    }
+
+                    QuickPresetChip(
+                        title: "Monthly",
+                        isSelected: viewModel.frequency == "Monthly" && viewModel.interval == 1
+                    ) {
+                        viewModel.frequency = "Monthly"
+                        viewModel.interval = 1
+                    }
+
+                    QuickPresetChip(
+                        title: "Yearly",
+                        isSelected: viewModel.frequency == "Yearly" && viewModel.interval == 1
+                    ) {
+                        viewModel.frequency = "Yearly"
+                        viewModel.interval = 1
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var startDateSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Start Date")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary)
+                .textCase(.uppercase)
+
+            Button {
+                showingStartDatePicker = true
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Starting From")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.textPrimary)
+                        Text("First transaction will be created on this date")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    Spacer()
+                    Text(Formatters.date.string(from: viewModel.transactionDate))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppTheme.accent)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(AppTheme.textTertiary)
+                }
+                .padding()
+                .background(AppTheme.cardBackground)
+                .cornerRadius(12)
+            }
+        }
+        .padding(.horizontal, 20)
     }
 
     private var frequencySection: some View {
@@ -407,94 +503,110 @@ private struct RecurringConfigSheet: View {
 
     private var executionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Execution")
+            Text("End Condition")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(AppTheme.textSecondary)
                 .textCase(.uppercase)
 
-            VStack(spacing: 0) {
-                // End Date
-                Button {
-                    if viewModel.hasEndDate {
-                        showingEndDatePicker = true
-                    } else {
-                        viewModel.hasEndDate = true
-                        if viewModel.endDate == nil {
-                            viewModel.endDate = Calendar.current.date(byAdding: .year, value: 1, to: viewModel.transactionDate)
-                        }
-                        showingEndDatePicker = true
-                    }
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("End Date")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Text("Optional end date")
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textSecondary)
-                        }
-                        Spacer()
-                        if viewModel.hasEndDate {
-                            Text(viewModel.endDate.map { Formatters.date.string(from: $0) } ?? "Select")
-                                .font(.system(size: 14))
-                                .foregroundColor(AppTheme.textSecondary)
-                        } else {
-                            Text("Never End")
-                                .font(.system(size: 14))
-                                .foregroundColor(AppTheme.textSecondary)
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppTheme.textTertiary)
-                    }
-                    .padding()
+            // Segmented Picker for End Condition
+            HStack(spacing: 0) {
+                EndConditionButton(
+                    title: "Never End",
+                    isSelected: !viewModel.hasEndDate && !viewModel.hasOccurrenceLimit,
+                    position: .leading
+                ) {
+                    viewModel.hasEndDate = false
+                    viewModel.hasOccurrenceLimit = false
                 }
 
-                Divider().padding(.leading, 16)
+                EndConditionButton(
+                    title: "End Date",
+                    isSelected: viewModel.hasEndDate,
+                    position: .middle
+                ) {
+                    viewModel.hasEndDate = true
+                    viewModel.hasOccurrenceLimit = false
+                    if viewModel.endDate == nil {
+                        viewModel.endDate = Calendar.current.date(byAdding: .year, value: 1, to: viewModel.transactionDate)
+                    }
+                }
 
-                // Executions Number
-                Button {
-                    if viewModel.hasOccurrenceLimit {
-                        showingExecutionNumberInput = true
-                    } else {
-                        viewModel.hasOccurrenceLimit = true
-                        if viewModel.occurrenceLimitString.isEmpty {
-                            viewModel.occurrenceLimitString = "12"
-                        }
-                        showingExecutionNumberInput = true
+                EndConditionButton(
+                    title: "Max Times",
+                    isSelected: viewModel.hasOccurrenceLimit,
+                    position: .trailing
+                ) {
+                    viewModel.hasEndDate = false
+                    viewModel.hasOccurrenceLimit = true
+                    if viewModel.occurrenceLimitString.isEmpty {
+                        viewModel.occurrenceLimitString = "12"
                     }
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Executions Number")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Text("Maximum number of executions")
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.textSecondary)
-                        }
-                        Spacer()
-                        if viewModel.hasOccurrenceLimit {
-                            Text(viewModel.occurrenceLimitString.isEmpty ? "Enter" : viewModel.occurrenceLimitString)
-                                .font(.system(size: 14))
-                                .foregroundColor(AppTheme.textSecondary)
-                        } else {
-                            Text("No limited")
-                                .font(.system(size: 14))
-                                .foregroundColor(AppTheme.textSecondary)
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppTheme.textTertiary)
-                    }
-                    .padding()
                 }
             }
+            .frame(height: 44)
+
+            // Show input based on selection
+            if viewModel.hasEndDate {
+                endDateInputRow
+            } else if viewModel.hasOccurrenceLimit {
+                executionNumberInputRow
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var endDateInputRow: some View {
+        Button {
+            showingEndDatePicker = true
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Select End Date")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text("Recurring will stop on this date")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+                Spacer()
+                Text(viewModel.endDate.map { Formatters.date.string(from: $0) } ?? "Select")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppTheme.accent)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+            .padding()
             .background(AppTheme.cardBackground)
             .cornerRadius(12)
         }
-        .padding(.horizontal, 20)
+    }
+
+    private var executionNumberInputRow: some View {
+        Button {
+            showingExecutionNumberInput = true
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Maximum Executions")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text("Recurring will stop after this many times")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+                Spacer()
+                Text(viewModel.occurrenceLimitString.isEmpty ? "Enter" : "\(viewModel.occurrenceLimitString)x")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppTheme.accent)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+            .padding()
+            .background(AppTheme.cardBackground)
+            .cornerRadius(12)
+        }
     }
 
     private var weekdaySection: some View {
@@ -542,6 +654,31 @@ private struct RecurringConfigSheet: View {
                 }
                 dayButton(0, label: "Last")
             }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var approvalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Transaction Approval")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary)
+                .textCase(.uppercase)
+
+            Toggle(isOn: $viewModel.requiresConfirmation) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Need Approve")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.textPrimary)
+                    Text("Require manual approval before each transaction is created")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textSecondary)
+                }
+            }
+            .tint(AppTheme.accent)
+            .padding()
+            .background(AppTheme.cardBackground)
+            .cornerRadius(12)
         }
         .padding(.horizontal, 20)
     }
@@ -608,6 +745,33 @@ private struct RecurringConfigSheet: View {
         case 7: return "S"
         default: return ""
         }
+    }
+
+    private var startDatePickerSheet: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                DatePicker(
+                    "Start Date",
+                    selection: $viewModel.transactionDate,
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+
+                Spacer()
+            }
+            .background(AppTheme.backgroundSolid)
+            .navigationTitle("Start Date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showingStartDatePicker = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
     }
 
     private var endDatePickerSheet: some View {
@@ -707,6 +871,89 @@ private struct RecurringConfigSheet: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Quick Preset Chip Component
+
+struct QuickPresetChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(isSelected ? AppTheme.accent : AppTheme.secondaryBackground)
+                .cornerRadius(20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(isSelected ? AppTheme.accent : AppTheme.textTertiary.opacity(0.3), lineWidth: 1)
+                )
+        }
+    }
+}
+
+// MARK: - End Condition Button Component
+
+private struct EndConditionButton: View {
+    let title: String
+    let isSelected: Bool
+    let position: Position
+    let action: () -> Void
+
+    enum Position {
+        case leading, middle, trailing
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(isSelected ? AppTheme.accent : AppTheme.secondaryBackground)
+        }
+        .cornerRadius(cornerRadius, corners: corners)
+    }
+
+    private var cornerRadius: CGFloat { 8 }
+
+    private var corners: UIRectCorner {
+        switch position {
+        case .leading:
+            return [.topLeft, .bottomLeft]
+        case .middle:
+            return []
+        case .trailing:
+            return [.topRight, .bottomRight]
+        }
+    }
+}
+
+// Helper extension for selective corner radius
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+private struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
     }
 }
 

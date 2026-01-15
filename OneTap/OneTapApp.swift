@@ -13,10 +13,9 @@ struct OneTapApp: App {
     @StateObject private var dependencyContainer = DependencyContainer()
 
     init() {
-        // Register background tasks
-        Task { @MainActor in
-            BackgroundTaskManager.shared.registerBackgroundTasks()
-        }
+        // Register background tasks SYNCHRONOUSLY before app starts
+        // This must happen before any scheduling attempts
+        BackgroundTaskManager.shared.registerBackgroundTasks()
     }
 
     var body: some Scene {
@@ -25,19 +24,19 @@ struct OneTapApp: App {
                 .environment(\.managedObjectContext, dependencyContainer.persistenceController.container.viewContext)
                 .environmentObject(dependencyContainer)
                 .task {
-                    // Configure background task manager
+                    // 1. Configure background task manager with service
                     BackgroundTaskManager.shared.configure(
                         with: dependencyContainer.recurringTransactionService
                     )
 
-                    // Process recurring transactions on app launch
+                    // 2. Process recurring transactions on app launch
                     do {
                         try await dependencyContainer.recurringTransactionService.processRecurringTransactions()
                     } catch {
                         print("Error processing recurring transactions: \(error)")
                     }
 
-                    // Schedule background processing
+                    // 3. Schedule background processing (registration already done in init)
                     BackgroundTaskManager.shared.scheduleRecurringTransactionsProcessing()
                 }
         }

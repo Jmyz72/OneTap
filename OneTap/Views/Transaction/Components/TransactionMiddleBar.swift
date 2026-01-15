@@ -24,6 +24,9 @@ struct TransactionMiddleBar: View {
     let installmentPayments: Int16
     let formattedInstallmentPayment: String
 
+    // Exclusion State
+    @Binding var excludeFromReports: Bool
+
     let selectedType: TransactionType
 
     // Actions
@@ -34,6 +37,7 @@ struct TransactionMiddleBar: View {
     let onNoteTap: () -> Void
     let onRecurringTap: () -> Void
     let onInstallmentTap: () -> Void
+    let onExclusionTap: () -> Void
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -67,6 +71,15 @@ struct TransactionMiddleBar: View {
                             isActive: !splitItems.isEmpty
                         )
                     }
+                }
+
+                // Exclude from Reports Chip
+                Button(action: onExclusionTap) {
+                    chipView(
+                        icon: "eye.slash",
+                        text: "Exclude",
+                        isActive: excludeFromReports
+                    )
                 }
 
                 // Installment Chip (Credit accounts only)

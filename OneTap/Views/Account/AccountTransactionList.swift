@@ -12,11 +12,15 @@ struct AccountTransactionList: View {
     let account: Account
     @EnvironmentObject private var container: DependencyContainer
     @State private var viewModel: AccountTransactionListViewModel?
+    @State private var showingAddTransaction = false
 
     var body: some View {
         Group {
             if let viewModel = viewModel {
-                TransactionListContent(viewModel: viewModel)
+                TransactionListContent(
+                    viewModel: viewModel,
+                    showingAddTransaction: $showingAddTransaction
+                )
             } else {
                 VStack {
                     ProgressView()
@@ -31,6 +35,9 @@ struct AccountTransactionList: View {
                 viewModel = container.makeAccountTransactionListViewModel(account: account)
             }
         }
+        .sheet(isPresented: $showingAddTransaction) {
+            AddTransactionView()
+        }
     }
 }
 
@@ -38,6 +45,7 @@ struct AccountTransactionList: View {
 
 private struct TransactionListContent: View {
     @ObservedObject var viewModel: AccountTransactionListViewModel
+    @Binding var showingAddTransaction: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,11 +64,8 @@ private struct TransactionListContent: View {
                     }
                     .padding(30)
                 } else {
-                    // Empty state or filtered out
-                    Text("No transactions")
-                        .font(.system(size: 14))
-                        .foregroundColor(AppTheme.textSecondary)
-                        .padding(20)
+                    // Empty state
+                    EmptyTransactionsView(showingAddTransaction: $showingAddTransaction)
                 }
             } else {
                 ForEach(viewModel.sections, id: \.self) { sectionKey in
@@ -107,5 +112,59 @@ private struct TransactionListContent: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.white.opacity(0.05), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Empty State
+
+private struct EmptyTransactionsView: View {
+    @Binding var showingAddTransaction: Bool
+
+    var body: some View {
+        VStack(spacing: 20) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(AppTheme.secondaryBackground)
+                    .frame(width: 80, height: 80)
+
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 36))
+                    .foregroundColor(AppTheme.textTertiary)
+            }
+
+            // Message
+            VStack(spacing: 8) {
+                Text("No Transactions Yet")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+
+                Text("Get started by adding your first transaction")
+                    .font(.system(size: 14))
+                    .foregroundColor(AppTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Action Button
+            Button {
+                showingAddTransaction = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 16))
+
+                    Text("Add Transaction")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(AppTheme.accent)
+                .cornerRadius(12)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+        .padding(.horizontal, 40)
     }
 }

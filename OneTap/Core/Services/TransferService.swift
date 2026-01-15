@@ -129,7 +129,8 @@ class TransferService: TransferServiceProtocol {
             category: nil,
             subCategory: nil,
             merchant: nil,
-            notes: nil
+            notes: nil,
+            excludeFromReports: nil
         ))
 
         // Update linked transaction
@@ -142,7 +143,8 @@ class TransferService: TransferServiceProtocol {
             category: nil,
             subCategory: nil,
             merchant: nil,
-            notes: nil
+            notes: nil,
+            excludeFromReports: nil
         ))
 
         // Update titles if destination changed

@@ -118,6 +118,9 @@ class AnalyticsViewModel: ObservableObject, ViewModelProtocol {
         var expense: Double = 0
 
         for transaction in transactions {
+            // Skip excluded transactions
+            guard !transaction.excludeFromReports else { continue }
+
             switch transaction.typeEnum {
             case .income:
                 income += transaction.amount
@@ -134,8 +137,8 @@ class AnalyticsViewModel: ObservableObject, ViewModelProtocol {
     }
 
     private func calculateCategoryBreakdown(from transactions: [Transaction]) {
-        // Group expenses by category
-        let expenseTransactions = transactions.filter { $0.typeEnum == .expense }
+        // Group expenses by category (excluding those marked to exclude from reports)
+        let expenseTransactions = transactions.filter { $0.typeEnum == .expense && !$0.excludeFromReports }
 
         var categoryTotals: [String: (category: Category?, amount: Double)] = [:]
 
@@ -168,6 +171,8 @@ class AnalyticsViewModel: ObservableObject, ViewModelProtocol {
         var monthlyData: [String: (income: Double, expense: Double)] = [:]
 
         for transaction in transactions {
+            // Skip excluded transactions
+            guard !transaction.excludeFromReports else { continue }
             guard let date = transaction.date else { continue }
             let monthKey = Formatters.monthYear.string(from: date)
 

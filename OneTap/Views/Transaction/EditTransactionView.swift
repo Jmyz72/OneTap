@@ -221,6 +221,7 @@ private struct EditTransactionContent: View {
             showInstallmentOption: false,
             installmentPayments: 0,
             formattedInstallmentPayment: "",
+            excludeFromReports: $viewModel.excludeFromReports,
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -232,7 +233,8 @@ private struct EditTransactionContent: View {
             onSplitTap: { showingSplitSheet = true },
             onNoteTap: { showingNoteInput = true },
             onRecurringTap: { showingRecurringPicker = true },
-            onInstallmentTap: { }
+            onInstallmentTap: { },
+            onExclusionTap: { viewModel.excludeFromReports.toggle() }
         )
     }
 

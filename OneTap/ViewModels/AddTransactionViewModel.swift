@@ -36,6 +36,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var endDate: Date?
     @Published var selectedWeekdays: Set<Int> = [] // 1=Sunday, 2=Monday, etc.
     @Published var selectedMonthDay: Int = 1 // 0=Last Day, 1-31=Specific day
+    @Published var requiresConfirmation = false
     let frequencies = ["Daily", "Weekly", "Monthly", "Yearly"]
 
     // Installment State (for credit accounts)
@@ -44,10 +45,14 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var installmentBillingDay: Int16 = 1
     let installmentOptions: [Int16] = [3, 6, 9, 12, 18, 24]
 
+    // Exclusion State
+    @Published var excludeFromReports = false
+
     // Data from repositories
     @Published var categories: [Category] = []
     @Published var accounts: [Account] = []
     @Published var merchantSuggestions: [String] = []
+    @Published var recentMerchants: [String] = []
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -180,6 +185,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         // Initial fetch to set defaults
         accounts = accountRepository.fetchAccounts(group: nil)
         categories = categoryRepository.fetchCategories(type: nil)
+        recentMerchants = transactionRepository.fetchRecentMerchants(limit: 5)
 
         // Auto-select first account (helpful default)
         if selectedAccount == nil {
@@ -203,6 +209,10 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
 
     func updateMerchantSuggestions() {
         merchantSuggestions = transactionRepository.fetchUniqueMerchants(matching: merchant)
+    }
+
+    func fetchAllMerchants() -> [String] {
+        return transactionRepository.fetchUniqueMerchants(matching: "")
     }
 
     func addSplitItem() {
@@ -342,7 +352,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                         endDate: hasEndDate ? endDate : nil,
                         interval: interval,
                         weeklyDays: weeklyDaysString,
-                        monthlyDay: monthlyDayValue
+                        monthlyDay: monthlyDayValue,
+                        requiresConfirmation: requiresConfirmation
                     )
 
                     // Add split items to template if any
@@ -366,7 +377,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                         category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
                         subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
                         merchant: merchant.isEmpty ? nil : merchant,
-                        notes: note.isEmpty ? nil : note
+                        notes: note.isEmpty ? nil : note,
+                        excludeFromReports: excludeFromReports
                     )
 
                     // Add split items if any
