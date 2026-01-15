@@ -25,6 +25,14 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     @Published var upcomingRecurring: [RecurringTransaction] = []
     @Published var pendingRecurringTransactions: [PendingRecurringTransaction] = []
 
+    // Today's activity
+    @Published var todayIncome: Double = 0
+    @Published var todayExpense: Double = 0
+    @Published var dueToday: [RecurringTransaction] = []
+
+    // Savings goals
+    @Published var savingsGoals: [SavingsGoal] = []
+
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
 
@@ -91,6 +99,26 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         !upcomingRecurring.isEmpty
     }
 
+    // Today's activity formatted
+    var formattedTodayExpense: String {
+        formatCurrency(todayExpense)
+    }
+
+    var formattedTodayIncome: String {
+        formatCurrency(todayIncome)
+    }
+
+    // Attention count (alerts + pending)
+    var attentionCount: Int {
+        budgetAlerts.count + pendingRecurringTransactions.count
+    }
+
+    // Upcoming total amount
+    var formattedUpcomingTotal: String {
+        let total = upcomingRecurring.reduce(0.0) { $0 + $1.amount }
+        return formatCurrency(total)
+    }
+
     // MARK: - Setup
 
     private func setupObservers() {
@@ -116,6 +144,9 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         // Get this month's income and expenses
         calculateMonthlyTotals()
 
+        // Get today's activity
+        calculateTodayActivity()
+
         // Get recent transactions
         fetchRecentTransactions()
 
@@ -125,8 +156,14 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         // Get upcoming recurring transactions
         fetchUpcomingRecurring()
 
+        // Get due today
+        fetchDueToday()
+
         // Get pending recurring transactions
         fetchPendingRecurring()
+
+        // Get savings goals
+        fetchSavingsGoals()
 
         loadingState = .loaded
     }
@@ -196,6 +233,65 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         let sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
         let allTransactions = transactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
         recentTransactions = Array(allTransactions.prefix(5))
+    }
+
+    private func calculateTodayActivity() {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfDay = calendar.startOfDay(for: now)
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+            return
+        }
+
+        let predicate = NSPredicate(
+            format: "date >= %@ AND date < %@",
+            startOfDay as NSDate,
+            endOfDay as NSDate
+        )
+        let transactions = transactionRepository.fetch(
+            predicate: predicate,
+            sortDescriptors: [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
+        )
+
+        var income: Double = 0
+        var expense: Double = 0
+
+        for transaction in transactions {
+            switch transaction.typeEnum {
+            case .income:
+                income += transaction.amount
+            case .expense:
+                expense += transaction.amount
+            case .transfer, .adjustment:
+                break
+            }
+        }
+
+        todayIncome = income
+        todayExpense = expense
+    }
+
+    private func fetchDueToday() {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfDay = calendar.startOfDay(for: now)
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+            return
+        }
+
+        let predicate = NSPredicate(
+            format: "isActive == YES AND nextRunDate != nil AND nextRunDate >= %@ AND nextRunDate < %@",
+            startOfDay as NSDate,
+            endOfDay as NSDate
+        )
+        let sortDescriptors = [NSSortDescriptor(keyPath: \RecurringTransaction.nextRunDate, ascending: true)]
+
+        dueToday = recurringTransactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
+    }
+
+    private func fetchSavingsGoals() {
+        let accounts = accountRepository.fetchAccounts(group: nil, includeArchived: false)
+        savingsGoals = accounts.compactMap { $0.savingsGoal }
     }
 
     private func checkBudgetAlerts() {
