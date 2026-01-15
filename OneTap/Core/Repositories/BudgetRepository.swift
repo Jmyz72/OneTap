@@ -3,14 +3,29 @@ import Foundation
 import Combine
 
 protocol BudgetRepositoryProtocol {
+    // CRUD
     func create(_ dto: BudgetCreateData) throws -> Budget
     func fetch(id: UUID) throws -> Budget
     func fetchAll() throws -> [Budget]
-    func fetchActive(for category: Category, on date: Date) throws -> Budget?
+    func fetchActive() throws -> [Budget]
     func update(_ budget: Budget, with dto: BudgetUpdateData) throws
     func delete(_ budget: Budget) throws
-    func recalculateSpent(for budget: Budget) throws
+    func save() throws
 
+    // Queries
+    func fetchBudget(for category: Category) throws -> Budget?
+    func fetchBudget(for subCategory: SubCategory) throws -> Budget?
+    func fetchSubCategoryBudgets(for category: Category) throws -> [Budget]
+
+    // Calculations
+    func calculateSpent(for category: Category, subCategory: SubCategory?, in month: Date) throws -> Double
+    func calculateMinimumAmount(for category: Category) throws -> Double
+
+    // Summaries
+    func getCategorySpendingSummaries(for month: Date) throws -> [CategorySpendingSummary]
+    func getSubCategorySpendingSummaries(for category: Category, in month: Date) throws -> [SubCategorySpendingSummary]
+
+    // Publisher
     var budgetsPublisher: AnyPublisher<[Budget], Never> { get }
 }
 
@@ -43,25 +58,53 @@ class BudgetRepository: BaseRepository, BudgetRepositoryProtocol {
         }
     }
 
+    /// Get start and end of a given month
+    private func monthBoundaries(for date: Date) -> (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month], from: date)
+        let startOfMonth = calendar.date(from: components)!
+        let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, second: -1), to: startOfMonth)!
+        return (startOfMonth, endOfMonth)
+    }
+
     // MARK: - Create
 
     func create(_ dto: BudgetCreateData) throws -> Budget {
-        let budget = Budget(context: context)
-        budget.id = UUID()
-        budget.amount = dto.amount
-        budget.spent = 0
-        budget.startDate = dto.startDate
-        budget.endDate = dto.endDate
-        budget.createdAt = Date()
-        budget.updatedAt = Date()
-
-        // Fetch and set category
+        // Check if budget already exists for this category/subcategory
         let categoryRequest = Category.fetchRequest()
         categoryRequest.predicate = NSPredicate(format: "id == %@", dto.categoryID as CVarArg)
         guard let category = try context.fetch(categoryRequest).first else {
             throw RepositoryError.entityNotFound
         }
+
+        var subCategory: SubCategory?
+        if let subCategoryID = dto.subCategoryID {
+            let subRequest = SubCategory.fetchRequest()
+            subRequest.predicate = NSPredicate(format: "id == %@", subCategoryID as CVarArg)
+            subCategory = try context.fetch(subRequest).first
+            if subCategory == nil {
+                throw RepositoryError.entityNotFound
+            }
+
+            // Check if budget already exists for this subcategory
+            if try fetchBudget(for: subCategory!) != nil {
+                throw RepositoryError.duplicateEntity
+            }
+        } else {
+            // Check if budget already exists for this category (without subcategory)
+            if try fetchBudget(for: category) != nil {
+                throw RepositoryError.duplicateEntity
+            }
+        }
+
+        let budget = Budget(context: context)
+        budget.id = UUID()
+        budget.amount = dto.amount
+        budget.isActive = true
+        budget.createdAt = Date()
+        budget.updatedAt = Date()
         budget.category = category
+        budget.subCategory = subCategory
 
         try context.save()
         return budget
@@ -78,36 +121,50 @@ class BudgetRepository: BaseRepository, BudgetRepositoryProtocol {
     }
 
     func fetchAll() throws -> [Budget] {
-        let sortDescriptors = [NSSortDescriptor(keyPath: \Budget.startDate, ascending: false)]
+        let sortDescriptors = [NSSortDescriptor(keyPath: \Budget.createdAt, ascending: false)]
         return try fetch(sortDescriptors: sortDescriptors)
     }
 
-    func fetchActive(for category: Category, on date: Date) throws -> Budget? {
-        let predicate = NSPredicate(
-            format: "category == %@ AND startDate <= %@ AND endDate >= %@",
-            category, date as NSDate, date as NSDate
-        )
+    func fetchActive() throws -> [Budget] {
+        let predicate = NSPredicate(format: "isActive == YES")
+        let sortDescriptors = [NSSortDescriptor(keyPath: \Budget.createdAt, ascending: false)]
+        return try fetch(predicate: predicate, sortDescriptors: sortDescriptors)
+    }
+
+    func fetchBudget(for category: Category) throws -> Budget? {
+        // Fetch category-level budget (subCategory is nil)
+        let predicate = NSPredicate(format: "category == %@ AND subCategory == nil AND isActive == YES", category)
         return try fetch(predicate: predicate).first
+    }
+
+    func fetchBudget(for subCategory: SubCategory) throws -> Budget? {
+        let predicate = NSPredicate(format: "subCategory == %@ AND isActive == YES", subCategory)
+        return try fetch(predicate: predicate).first
+    }
+
+    func fetchSubCategoryBudgets(for category: Category) throws -> [Budget] {
+        let predicate = NSPredicate(format: "category == %@ AND subCategory != nil AND isActive == YES", category)
+        return try fetch(predicate: predicate)
     }
 
     // MARK: - Update
 
     func update(_ budget: Budget, with dto: BudgetUpdateData) throws {
         if let amount = dto.amount {
+            // Validate minimum amount for category budgets
+            if budget.subCategory == nil, let category = budget.category {
+                let minimumAmount = try calculateMinimumAmount(for: category)
+                if amount < minimumAmount {
+                    throw RepositoryError.validationFailed("Budget amount cannot be less than sum of subcategory budgets (\(minimumAmount))")
+                }
+            }
             budget.amount = amount
         }
-        if let spent = dto.spent {
-            budget.spent = spent
-        }
-        if let startDate = dto.startDate {
-            budget.startDate = startDate
-        }
-        if let endDate = dto.endDate {
-            budget.endDate = endDate
+        if let isActive = dto.isActive {
+            budget.isActive = isActive
         }
 
         budget.updatedAt = Date()
-
         try context.save()
     }
 
@@ -118,54 +175,117 @@ class BudgetRepository: BaseRepository, BudgetRepositoryProtocol {
         try context.save()
     }
 
-    // MARK: - Business Logic
+    func save() throws {
+        if context.hasChanges {
+            try context.save()
+        }
+    }
 
-    func recalculateSpent(for budget: Budget) throws {
-        guard let category = budget.category,
-              let startDate = budget.startDate,
-              let endDate = budget.endDate else {
-            throw RepositoryError.entityNotFound
+    // MARK: - Calculations
+
+    func calculateSpent(for category: Category, subCategory: SubCategory?, in month: Date) throws -> Double {
+        let (startOfMonth, endOfMonth) = monthBoundaries(for: month)
+
+        let transactionRequest = Transaction.fetchRequest()
+
+        if let subCategory = subCategory {
+            // SubCategory budget: only transactions with this specific subcategory
+            transactionRequest.predicate = NSPredicate(
+                format: "subCategory == %@ AND date >= %@ AND date <= %@ AND type == %@",
+                subCategory,
+                startOfMonth as NSDate,
+                endOfMonth as NSDate,
+                TransactionType.expense.rawValue
+            )
+        } else {
+            // Category budget: all transactions in this category (including all subcategories)
+            transactionRequest.predicate = NSPredicate(
+                format: "category == %@ AND date >= %@ AND date <= %@ AND type == %@",
+                category,
+                startOfMonth as NSDate,
+                endOfMonth as NSDate,
+                TransactionType.expense.rawValue
+            )
         }
 
-        // Fetch all transactions for this category in the budget period
-        let transactionRequest = Transaction.fetchRequest()
-        transactionRequest.predicate = NSPredicate(
-            format: "category == %@ AND date >= %@ AND date <= %@",
-            category,
-            startDate as NSDate,
-            endDate as NSDate
-        )
-
         let transactions = try context.fetch(transactionRequest)
+        return transactions.reduce(0.0) { $0 + $1.amount }
+    }
 
-        // Calculate total spent (Expenses only)
-        let totalSpent = transactions
-            .filter { $0.type == TransactionType.expense.rawValue }
-            .reduce(0.0) { $0 + $1.amount }
+    func calculateMinimumAmount(for category: Category) throws -> Double {
+        let subBudgets = try fetchSubCategoryBudgets(for: category)
+        return subBudgets.reduce(0.0) { $0 + $1.amount }
+    }
 
-        budget.spent = totalSpent
-        budget.updatedAt = Date()
+    // MARK: - Summaries
 
-        try context.save()
+    func getCategorySpendingSummaries(for month: Date) throws -> [CategorySpendingSummary] {
+        // Get all expense categories
+        let categoryRequest = Category.fetchRequest()
+        categoryRequest.predicate = NSPredicate(format: "type == %@", TransactionType.expense.rawValue)
+        categoryRequest.sortDescriptors = [NSSortDescriptor(keyPath: \Category.order, ascending: true)]
+
+        let categories = try context.fetch(categoryRequest)
+        var summaries: [CategorySpendingSummary] = []
+
+        for category in categories {
+            let spent = try calculateSpent(for: category, subCategory: nil, in: month)
+            let budget = try fetchBudget(for: category)
+            let subSummaries = try getSubCategorySpendingSummaries(for: category, in: month)
+
+            let summary = CategorySpendingSummary(
+                id: category.id ?? UUID(),
+                category: category,
+                spent: spent,
+                budget: budget,
+                subCategorySummaries: subSummaries,
+                month: month
+            )
+            summaries.append(summary)
+        }
+
+        return summaries
+    }
+
+    func getSubCategorySpendingSummaries(for category: Category, in month: Date) throws -> [SubCategorySpendingSummary] {
+        guard let subCategories = category.subCategories?.allObjects as? [SubCategory] else {
+            return []
+        }
+
+        var summaries: [SubCategorySpendingSummary] = []
+
+        for subCategory in subCategories.sorted(by: { $0.order < $1.order }) {
+            let spent = try calculateSpent(for: category, subCategory: subCategory, in: month)
+            let budget = try fetchBudget(for: subCategory)
+
+            let summary = SubCategorySpendingSummary(
+                id: subCategory.id ?? UUID(),
+                subCategory: subCategory,
+                spent: spent,
+                budget: budget,
+                month: month
+            )
+            summaries.append(summary)
+        }
+
+        return summaries
     }
 
     // MARK: - Publisher
 
     var budgetsPublisher: AnyPublisher<[Budget], Never> {
-        let initial = (try? fetchAll()) ?? []
+        let initial = (try? fetchActive()) ?? []
         let subject = CurrentValueSubject<[Budget], Never>(initial)
 
         NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
             .sink { [weak self] notification in
                 guard let self = self else { return }
 
-                // Accept saves from any context with same persistent store
                 guard let savedContext = notification.object as? NSManagedObjectContext,
                       savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
                     return
                 }
 
-                // Check if Budget was changed
                 let inserted = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
                 let updated = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
                 let deleted = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
@@ -175,7 +295,7 @@ class BudgetRepository: BaseRepository, BudgetRepositoryProtocol {
 
                 guard hasChanges else { return }
 
-                let budgets = (try? self.fetchAll()) ?? []
+                let budgets = (try? self.fetchActive()) ?? []
                 subject.send(budgets)
             }
             .store(in: &cancellables)
