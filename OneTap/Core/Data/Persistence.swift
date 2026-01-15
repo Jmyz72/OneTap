@@ -163,17 +163,21 @@ class PersistenceController {
                 return
             }
 
+            // Extract updated object IDs before entering perform block to avoid capturing non-Sendable Notification
+            let updatedObjectIDs: [NSManagedObjectID] = (notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject>)?
+                .map { $0.objectID } ?? []
+
             // Merge changes into view context
             self.container.viewContext.perform {
                 // Refresh updated objects to ensure UI shows latest values
-                if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
-                    for object in updatedObjects {
-                        // Get the object in the view context and refresh it
-                        if let viewContextObject = try? self.container.viewContext.existingObject(with: object.objectID) {
-                            self.container.viewContext.refresh(viewContextObject, mergeChanges: true)
-                        }
+                for objectID in updatedObjectIDs {
+                    // Get the object in the view context and refresh it
+                    if let viewContextObject = try? self.container.viewContext.existingObject(with: objectID) {
+                        self.container.viewContext.refresh(viewContextObject, mergeChanges: true)
                     }
+                }
 
+                if !updatedObjectIDs.isEmpty {
                     // CRITICAL: Process pending changes to trigger .NSManagedObjectContextObjectsDidChange
                     // This ensures Combine publishers and observers are notified
                     self.container.viewContext.processPendingChanges()

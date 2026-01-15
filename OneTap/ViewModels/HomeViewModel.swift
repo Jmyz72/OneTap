@@ -199,30 +199,44 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     }
 
     private func checkBudgetAlerts() {
-        let budgets = (try? budgetRepository.fetchAll()) ?? []
+        let budgets = (try? budgetRepository.fetchActive()) ?? []
         var alerts: [BudgetAlert] = []
 
         let now = Date()
         for budget in budgets {
-            // Only check active budgets
-            guard let startDate = budget.startDate,
-                  let endDate = budget.endDate,
-                  startDate <= now && now <= endDate else {
+            guard let category = budget.category else { continue }
+
+            // Calculate spent for current month
+            let spent: Double
+            do {
+                spent = try budgetRepository.calculateSpent(
+                    for: category,
+                    subCategory: budget.subCategory,
+                    in: now
+                )
+            } catch {
                 continue
             }
 
+            let amount = budget.amount
+            guard amount > 0 else { continue }
+
+            let progress = (spent / amount) * 100
+            let isExceeded = spent > amount
+            let isNearLimit = progress >= 80 && !isExceeded
+
             // Check if exceeded or near limit
-            if budget.isExceeded {
+            if isExceeded {
                 alerts.append(BudgetAlert(
                     budget: budget,
                     type: .exceeded,
-                    message: "\(budget.category?.name ?? "Budget") exceeded by \(formatCurrency(budget.spent - budget.amount))"
+                    message: "\(budget.displayName) exceeded by \(formatCurrency(spent - amount))"
                 ))
-            } else if budget.isNearLimit {
+            } else if isNearLimit {
                 alerts.append(BudgetAlert(
                     budget: budget,
                     type: .warning,
-                    message: "\(budget.category?.name ?? "Budget") at \(Int(budget.progress))%"
+                    message: "\(budget.displayName) at \(Int(progress))%"
                 ))
             }
         }

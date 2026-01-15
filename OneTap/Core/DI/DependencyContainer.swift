@@ -76,17 +76,15 @@ final class DependencyContainer: ObservableObject {
             recurringTransactionService: recurringTransactionService,
             transferService: transferService,
             balanceService: balanceService,
-            validationService: validationService,
-            budgetService: budgetService
+            validationService: validationService
         )
     }
 
-    func makeBudgetListViewModel() -> BudgetListViewModel {
-        BudgetListViewModel(budgetRepository: budgetRepository)
-    }
-
-    func makeBudgetFormViewModel(budget: Budget? = nil) -> BudgetFormViewModel {
-        BudgetFormViewModel(budgetRepository: budgetRepository, budget: budget)
+    func makeBudgetViewModel() -> BudgetViewModel {
+        BudgetViewModel(
+            budgetService: budgetService,
+            budgetRepository: budgetRepository
+        )
     }
 
     func makeEditTransactionViewModel(transaction: Transaction) -> EditTransactionViewModel {

@@ -14,6 +14,8 @@ enum RepositoryError: LocalizedError {
     case entityNotFound
     case invalidData(String)
     case contextUnavailable
+    case duplicateEntity
+    case validationFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +31,10 @@ enum RepositoryError: LocalizedError {
             return "Invalid data: \(message)"
         case .contextUnavailable:
             return "Core Data context unavailable"
+        case .duplicateEntity:
+            return "This item already exists"
+        case .validationFailed(let message):
+            return message
         }
     }
 }

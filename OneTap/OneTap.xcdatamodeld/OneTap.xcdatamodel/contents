@@ -14,19 +14,20 @@
         <attribute name="lastFourDigits" optional="YES" attributeType="String"/>
         <attribute name="name" attributeType="String"/>
         <attribute name="type" attributeType="String"/>
+        <relationship name="pendingRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PendingRecurringTransaction" inverseName="account" inverseEntity="PendingRecurringTransaction"/>
         <relationship name="recurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="account" inverseEntity="RecurringTransaction"/>
+        <relationship name="toAccountPendingRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PendingRecurringTransaction" inverseName="toAccount" inverseEntity="PendingRecurringTransaction"/>
         <relationship name="toAccountRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="toAccount" inverseEntity="RecurringTransaction"/>
         <relationship name="transactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Transaction" inverseName="account" inverseEntity="Transaction"/>
     </entity>
     <entity name="Budget" representedClassName="Budget" syncable="YES" codeGenerationType="class">
         <attribute name="amount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="endDate" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="spent" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
-        <attribute name="startDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="category" maxCount="1" deletionRule="Nullify" destinationEntity="Category" inverseName="budgets" inverseEntity="Category"/>
+        <relationship name="subCategory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SubCategory" inverseName="budgets" inverseEntity="SubCategory"/>
     </entity>
     <entity name="Category" representedClassName="Category" syncable="YES" codeGenerationType="class">
         <attribute name="color" attributeType="String" defaultValueString="blue"/>
@@ -36,6 +37,7 @@
         <attribute name="order" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="type" attributeType="String" defaultValueString="Expense"/>
         <relationship name="budgets" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Budget" inverseName="category" inverseEntity="Budget"/>
+        <relationship name="pendingRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PendingRecurringTransaction" inverseName="category" inverseEntity="PendingRecurringTransaction"/>
         <relationship name="recurringTransactionItems" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransactionItem" inverseName="category" inverseEntity="RecurringTransactionItem"/>
         <relationship name="recurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="category" inverseEntity="RecurringTransaction"/>
         <relationship name="subCategories" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="SubCategory" inverseName="category" inverseEntity="SubCategory"/>
@@ -71,6 +73,7 @@
         <relationship name="account" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="recurringTransactions" inverseEntity="Account"/>
         <relationship name="category" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Category" inverseName="recurringTransactions" inverseEntity="Category"/>
         <relationship name="items" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RecurringTransactionItem" inverseName="recurringTransaction" inverseEntity="RecurringTransactionItem"/>
+        <relationship name="pendingRecurringTransactions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PendingRecurringTransaction" inverseName="recurringTransaction" inverseEntity="PendingRecurringTransaction"/>
         <relationship name="subCategory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SubCategory" inverseName="recurringTransactions" inverseEntity="SubCategory"/>
         <relationship name="toAccount" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="toAccountRecurringTransactions" inverseEntity="Account"/>
         <relationship name="transactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Transaction" inverseName="recurringTransaction" inverseEntity="Transaction"/>
@@ -95,11 +98,11 @@
         <attribute name="scheduledDate" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="title" optional="YES" attributeType="String"/>
         <attribute name="type" attributeType="String" defaultValueString="Expense"/>
-        <relationship name="account" maxCount="1" deletionRule="Nullify" destinationEntity="Account"/>
-        <relationship name="category" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Category"/>
-        <relationship name="recurringTransaction" maxCount="1" deletionRule="Nullify" destinationEntity="RecurringTransaction"/>
-        <relationship name="subCategory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SubCategory"/>
-        <relationship name="toAccount" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Account"/>
+        <relationship name="account" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="pendingRecurringTransactions" inverseEntity="Account"/>
+        <relationship name="category" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Category" inverseName="pendingRecurringTransactions" inverseEntity="Category"/>
+        <relationship name="recurringTransaction" maxCount="1" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="pendingRecurringTransactions" inverseEntity="RecurringTransaction"/>
+        <relationship name="subCategory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SubCategory" inverseName="pendingRecurringTransactions" inverseEntity="SubCategory"/>
+        <relationship name="toAccount" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="toAccountPendingRecurringTransactions" inverseEntity="Account"/>
         <fetchIndex name="byScheduledDate">
             <fetchIndexElement property="scheduledDate" type="Binary" order="ascending"/>
         </fetchIndex>
@@ -109,7 +112,9 @@
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="name" attributeType="String"/>
         <attribute name="order" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="budgets" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Budget" inverseName="subCategory" inverseEntity="Budget"/>
         <relationship name="category" maxCount="1" deletionRule="Nullify" destinationEntity="Category" inverseName="subCategories" inverseEntity="Category"/>
+        <relationship name="pendingRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PendingRecurringTransaction" inverseName="subCategory" inverseEntity="PendingRecurringTransaction"/>
         <relationship name="recurringTransactionItems" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransactionItem" inverseName="subCategory" inverseEntity="RecurringTransactionItem"/>
         <relationship name="recurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="subCategory" inverseEntity="RecurringTransaction"/>
         <relationship name="transactionItems" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="TransactionItem" inverseName="subCategory" inverseEntity="TransactionItem"/>
