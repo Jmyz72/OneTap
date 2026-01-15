@@ -191,7 +191,7 @@ class BudgetRepository: BaseRepository, BudgetRepositoryProtocol {
         if let subCategory = subCategory {
             // SubCategory budget: only transactions with this specific subcategory
             transactionRequest.predicate = NSPredicate(
-                format: "subCategory == %@ AND date >= %@ AND date <= %@ AND type == %@",
+                format: "subCategory == %@ AND date >= %@ AND date <= %@ AND type == %@ AND excludeFromReports == NO",
                 subCategory,
                 startOfMonth as NSDate,
                 endOfMonth as NSDate,
@@ -200,7 +200,7 @@ class BudgetRepository: BaseRepository, BudgetRepositoryProtocol {
         } else {
             // Category budget: all transactions in this category (including all subcategories)
             transactionRequest.predicate = NSPredicate(
-                format: "category == %@ AND date >= %@ AND date <= %@ AND type == %@",
+                format: "category == %@ AND date >= %@ AND date <= %@ AND type == %@ AND excludeFromReports == NO",
                 category,
                 startOfMonth as NSDate,
                 endOfMonth as NSDate,

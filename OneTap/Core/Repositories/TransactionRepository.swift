@@ -154,7 +154,8 @@ class TransactionRepository: BaseRepository {
         subCategory: SubCategory?,
         merchant: String? = nil,
         notes: String?,
-        adjustmentReason: String? = nil
+        adjustmentReason: String? = nil,
+        excludeFromReports: Bool = false
     ) throws -> Transaction {
         // CRITICAL: Adjustment transactions must have a reason for audit trail
         if type == .adjustment {
@@ -178,6 +179,7 @@ class TransactionRepository: BaseRepository {
         transaction.merchant = merchant
         transaction.notes = notes
         transaction.adjustmentReason = adjustmentReason
+        transaction.excludeFromReports = excludeFromReports
         transaction.createdAt = Date()
         transaction.updatedAt = Date()
         transaction.balanceAfter = 0 // Will be calculated by BalanceService
@@ -212,6 +214,9 @@ class TransactionRepository: BaseRepository {
         }
         if let notes = data.notes {
             transaction.notes = notes
+        }
+        if let excludeFromReports = data.excludeFromReports {
+            transaction.excludeFromReports = excludeFromReports
         }
 
         transaction.updatedAt = Date()
@@ -336,6 +341,37 @@ class TransactionRepository: BaseRepository {
             return Array(merchants.prefix(Configuration.merchantSuggestionLimit))
         } catch {
             print("Error fetching merchants: \(error)")
+            return []
+        }
+    }
+
+    func fetchRecentMerchants(limit: Int = 5) -> [String] {
+        let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+        request.predicate = NSPredicate(format: "merchant != nil AND merchant != ''")
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
+        // Fetch enough to get diverse merchants after deduping
+        request.fetchLimit = 100
+
+        do {
+            let transactions = try context.fetch(request)
+            var seen = Set<String>()
+            var uniqueMerchants: [String] = []
+
+            for transaction in transactions {
+                if let merchant = transaction.merchant,
+                   !merchant.isEmpty,
+                   !seen.contains(merchant) {
+                    seen.insert(merchant)
+                    uniqueMerchants.append(merchant)
+                    if uniqueMerchants.count >= limit {
+                        break
+                    }
+                }
+            }
+
+            return uniqueMerchants
+        } catch {
+            print("Error fetching recent merchants: \(error)")
             return []
         }
     }

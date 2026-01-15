@@ -42,12 +42,8 @@ private struct RecurringTransactionsContent: View {
             } else {
                 List {
                     ForEach(viewModel.recurringTransactions, id: \.objectID) { recurring in
-                        NavigationLink {
-                            EditRecurringTransactionView(recurring: recurring)
-                        } label: {
-                            RecurringTransactionRow(recurring: recurring) {
-                                viewModel.toggleActive(recurring)
-                            }
+                        RecurringTransactionRow(recurring: recurring) {
+                            viewModel.toggleActive(recurring)
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -73,9 +69,7 @@ private struct RecurringTransactionsContent: View {
             }
         }
         .sheet(isPresented: $showingAddRecurring) {
-            NavigationStack {
-                AddRecurringTransactionView()
-            }
+            AddTransactionView(autoOpenRecurring: true)
         }
         .alert("Error", isPresented: Binding(
             get: { viewModel.errorMessage != nil },

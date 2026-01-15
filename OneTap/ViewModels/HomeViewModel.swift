@@ -43,6 +43,7 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     private let budgetRepository: BudgetRepository
     private let recurringTransactionRepository: RecurringTransactionRepository
     private let pendingRecurringRepository: PendingRecurringRepository
+    private let balanceService: BalanceService
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -50,13 +51,15 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         transactionRepository: TransactionRepository,
         budgetRepository: BudgetRepository,
         recurringTransactionRepository: RecurringTransactionRepository,
-        pendingRecurringRepository: PendingRecurringRepository
+        pendingRecurringRepository: PendingRecurringRepository,
+        balanceService: BalanceService
     ) {
         self.accountRepository = accountRepository
         self.transactionRepository = transactionRepository
         self.budgetRepository = budgetRepository
         self.recurringTransactionRepository = recurringTransactionRepository
         self.pendingRecurringRepository = pendingRecurringRepository
+        self.balanceService = balanceService
 
         setupObservers()
         Task {
@@ -214,6 +217,9 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         var expense: Double = 0
 
         for transaction in transactions {
+            // Skip excluded transactions
+            guard !transaction.excludeFromReports else { continue }
+
             switch transaction.typeEnum {
             case .income:
                 income += transaction.amount
@@ -257,6 +263,9 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         var expense: Double = 0
 
         for transaction in transactions {
+            // Skip excluded transactions
+            guard !transaction.excludeFromReports else { continue }
+
             switch transaction.typeEnum {
             case .income:
                 income += transaction.amount
@@ -370,13 +379,18 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
 
     func approvePendingTransaction(_ pending: PendingRecurringTransaction) async {
         do {
-            _ = try pendingRecurringRepository.approve(pending)
+            let transaction = try pendingRecurringRepository.approve(pending)
             try pendingRecurringRepository.save()
 
             // Update recurring transaction occurrence count if it has one
             if let recurring = pending.recurringTransaction {
                 recurring.occurrencesCount += 1
                 recurring.lastRunDate = pending.scheduledDate
+            }
+
+            // Recalculate balances for the affected account
+            if let account = transaction.account {
+                try await balanceService.recalculateBalances(for: account.objectID, from: transaction.date ?? Date())
             }
 
             // Refresh data

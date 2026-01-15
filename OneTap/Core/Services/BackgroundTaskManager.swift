@@ -13,7 +13,7 @@ class BackgroundTaskManager {
     static let shared = BackgroundTaskManager()
 
     // Background task identifier - must match Info.plist
-    private let taskIdentifier = "com.onetap.processRecurringTransactions"
+    private let taskIdentifier = "xxx.OneTap.processRecurringTransactions"
 
     private var recurringTransactionService: RecurringTransactionService?
 

@@ -30,6 +30,9 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var isRecurring = false
     @Published var frequency = "Monthly"
 
+    // Exclusion State
+    @Published var excludeFromReports: Bool
+
     // Data from repositories
     @Published var categories: [Category] = []
     @Published var accounts: [Account] = []
@@ -72,6 +75,7 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         self.title = transaction.title ?? ""
         self.merchant = transaction.merchant ?? ""
         self.note = transaction.notes ?? ""
+        self.excludeFromReports = transaction.excludeFromReports
 
         // Load data
         loadData()
@@ -239,7 +243,8 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
                 category: splitItems.isEmpty ? selectedCategory : splitItems.first?.category,
                 subCategory: splitItems.isEmpty ? selectedSubCategory : nil,
                 merchant: merchant.isEmpty ? nil : merchant,
-                notes: note.isEmpty ? nil : note
+                notes: note.isEmpty ? nil : note,
+                excludeFromReports: excludeFromReports
             )
 
             try transactionRepository.updateTransaction(transaction, with: updateData)
@@ -256,7 +261,8 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
                     category: nil,
                     subCategory: nil,
                     merchant: nil,
-                    notes: nil
+                    notes: nil,
+                    excludeFromReports: excludeFromReports
                 )
                 try transactionRepository.updateTransaction(linkedTransaction, with: linkedData)
             }

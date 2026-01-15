@@ -21,7 +21,7 @@ OneTap uses iOS Background Tasks to automatically process recurring transactions
 
 1. In the OneTap target settings, go to the "Info" tab
 2. Add a new row under "Permitted background task scheduler identifiers"
-3. Set the value to: `com.onetap.processRecurringTransactions`
+3. Set the value to: `xxx.OneTap.processRecurringTransactions`
 
 **OR** if using Info.plist file:
 

@@ -249,7 +249,7 @@ private struct HomeContent: View {
             }
 
             VStack(spacing: 8) {
-                // Budget Alerts
+                // Budget Alerts (non-swipeable)
                 ForEach(viewModel.budgetAlerts) { alert in
                     AttentionItemRow(
                         icon: alert.icon,
@@ -259,34 +259,68 @@ private struct HomeContent: View {
                     )
                 }
 
-                // Pending Approvals
-                ForEach(viewModel.pendingRecurringTransactions, id: \.objectID) { pending in
-                    AttentionItemRow(
-                        icon: "checkmark.circle.fill",
-                        title: "Approve: \(pending.displayTitle)",
-                        subtitle: pending.formattedScheduledDate,
-                        color: .blue
-                    )
-                    .contentShape(Rectangle())
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button {
-                            Task {
-                                await viewModel.approvePendingTransaction(pending)
+                // Pending Approvals (swipeable - must be in List)
+                if !viewModel.pendingRecurringTransactions.isEmpty {
+                    List {
+                        ForEach(viewModel.pendingRecurringTransactions, id: \.objectID) { pending in
+                            HStack(spacing: 10) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.blue)
+                                    .frame(width: 28, height: 28)
+                                    .background(Color.blue.opacity(0.15))
+                                    .cornerRadius(6)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Approve: \(pending.displayTitle)")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(AppTheme.textPrimary)
+
+                                    Text(pending.formattedScheduledDate)
+                                        .font(.system(size: 12))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                }
+
+                                Spacer()
+
+                                // Swipe hint
+                                HStack(spacing: 2) {
+                                    Image(systemName: "chevron.left")
+                                    Image(systemName: "chevron.left")
+                                }
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(AppTheme.textTertiary.opacity(0.5))
                             }
-                        } label: {
-                            Label("Approve", systemImage: "checkmark.circle.fill")
-                        }
-                        .tint(.green)
-                    }
-                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            Task {
-                                await viewModel.rejectPendingTransaction(pending)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                            .listRowSeparator(.hidden)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button {
+                                    Task {
+                                        await viewModel.approvePendingTransaction(pending)
+                                    }
+                                } label: {
+                                    Label("Approve", systemImage: "checkmark.circle.fill")
+                                }
+                                .tint(.green)
                             }
-                        } label: {
-                            Label("Reject", systemImage: "xmark.circle.fill")
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    Task {
+                                        await viewModel.rejectPendingTransaction(pending)
+                                    }
+                                } label: {
+                                    Label("Reject", systemImage: "xmark.circle.fill")
+                                }
+                            }
                         }
                     }
+                    .listStyle(.plain)
+                    .frame(height: CGFloat(viewModel.pendingRecurringTransactions.count) * 50)
+                    .scrollDisabled(true)
+                    .environment(\.defaultMinListRowHeight, 0)
                 }
             }
         }

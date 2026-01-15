@@ -77,7 +77,8 @@ class RecurringTransactionRepository: BaseRepository {
         endDate: Date? = nil,
         interval: Int = 1,
         weeklyDays: String? = nil,
-        monthlyDay: Int? = nil
+        monthlyDay: Int? = nil,
+        requiresConfirmation: Bool = false
     ) throws -> RecurringTransaction {
         let recurring = RecurringTransaction(context: context)
         recurring.id = UUID()
@@ -94,6 +95,7 @@ class RecurringTransactionRepository: BaseRepository {
         recurring.notes = notes
         recurring.toAccount = toAccount
         recurring.isActive = true
+        recurring.requiresConfirmation = requiresConfirmation
         recurring.createdAt = Date()
         recurring.updatedAt = Date()
         recurring.interval = Int16(interval)

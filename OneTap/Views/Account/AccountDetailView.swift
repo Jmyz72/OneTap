@@ -19,6 +19,7 @@ struct AccountDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
     @State private var showingGoalSheet = false
+    @State private var showingAddTransaction = false
 
     var body: some View {
         Group {
@@ -81,6 +82,9 @@ struct AccountDetailView: View {
                         account: account,
                         repository: container.savingsGoalRepository
                     )
+                }
+                .sheet(isPresented: $showingAddTransaction) {
+                    AddTransactionView()
                 }
                 .alert("Delete Account", isPresented: $showingDeleteAlert) {
                     Button("Cancel", role: .cancel) { }
@@ -191,7 +195,7 @@ struct AccountDetailView: View {
                     title: "Add",
                     color: AppTheme.income
                 ) {
-                    // TODO: Add transaction
+                    showingAddTransaction = true
                 }
 
                 CompactActionButton(
