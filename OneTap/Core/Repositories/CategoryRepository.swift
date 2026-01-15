@@ -30,10 +30,27 @@ class CategoryRepository: BaseRepository {
         let initialCategories = fetchCategories(type: type)
         let subject = CurrentValueSubject<[Category], Error>(initialCategories)
 
-        // Observe Core Data changes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave, object: context)
-            .sink { [weak self] _ in
+        // Observe Core Data changes from any context
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .sink { [weak self] notification in
                 guard let self = self else { return }
+
+                // Accept saves from any context with same persistent store
+                guard let savedContext = notification.object as? NSManagedObjectContext,
+                      savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
+                    return
+                }
+
+                // Check if Category was changed
+                let inserted = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+                let updated = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+                let deleted = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+
+                let hasChanges = (inserted.union(updated).union(deleted))
+                    .contains { $0 is Category }
+
+                guard hasChanges else { return }
+
                 let categories = self.fetchCategories(type: type)
                 subject.send(categories)
             }

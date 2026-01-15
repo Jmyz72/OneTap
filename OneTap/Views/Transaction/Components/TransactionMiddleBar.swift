@@ -17,9 +17,15 @@ struct TransactionMiddleBar: View {
     
     @Binding var isRecurring: Bool
     @Binding var frequency: String
-    
+
+    // Installment State
+    @Binding var isInstallment: Bool
+    let showInstallmentOption: Bool
+    let installmentPayments: Int16
+    let formattedInstallmentPayment: String
+
     let selectedType: TransactionType
-    
+
     // Actions
     let onSubCategoryTap: () -> Void
     let onAccountTap: () -> Void
@@ -27,6 +33,7 @@ struct TransactionMiddleBar: View {
     let onSplitTap: () -> Void
     let onNoteTap: () -> Void
     let onRecurringTap: () -> Void
+    let onInstallmentTap: () -> Void
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -58,6 +65,17 @@ struct TransactionMiddleBar: View {
                             icon: "basket.fill",
                             text: splitChipText,
                             isActive: !splitItems.isEmpty
+                        )
+                    }
+                }
+
+                // Installment Chip (Credit accounts only)
+                if showInstallmentOption {
+                    Button(action: onInstallmentTap) {
+                        chipView(
+                            icon: "creditcard.trianglebadge.exclamationmark",
+                            text: isInstallment ? "\(installmentPayments)x \(formattedInstallmentPayment)" : "Installment",
+                            isActive: isInstallment
                         )
                     }
                 }

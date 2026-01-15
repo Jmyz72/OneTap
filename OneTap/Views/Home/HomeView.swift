@@ -99,7 +99,7 @@ private struct HomeContent: View {
                 }
             }
             .navigationTitle("Home")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     ProfileButton()

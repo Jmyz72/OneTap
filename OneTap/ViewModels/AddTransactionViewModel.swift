@@ -38,6 +38,12 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     @Published var selectedMonthDay: Int = 1 // 0=Last Day, 1-31=Specific day
     let frequencies = ["Daily", "Weekly", "Monthly", "Yearly"]
 
+    // Installment State (for credit accounts)
+    @Published var isInstallment = false
+    @Published var installmentPayments: Int16 = 3
+    @Published var installmentBillingDay: Int16 = 1
+    let installmentOptions: [Int16] = [3, 6, 9, 12, 18, 24]
+
     // Data from repositories
     @Published var categories: [Category] = []
     @Published var accounts: [Account] = []
@@ -118,6 +124,25 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
             return nil
         }
         return limit
+    }
+
+    /// Shows installment option only for credit accounts (Credit Card, BNPL)
+    var showInstallmentOption: Bool {
+        guard let account = selectedAccount else { return false }
+        return account.isLiability && selectedType == .expense
+    }
+
+    /// Monthly payment amount for installment
+    var installmentMonthlyPayment: Double {
+        guard installmentPayments > 0 else { return 0 }
+        return totalAmount / Double(installmentPayments)
+    }
+
+    /// Formatted monthly payment for display
+    var formattedInstallmentPayment: String {
+        let code = selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        return formatter.string(from: NSNumber(value: installmentMonthlyPayment)) ?? "$0"
     }
 
     // MARK: - Observation
@@ -266,6 +291,25 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                     to: destAccount,
                     notes: note.isEmpty ? nil : note
                 )
+            } else if isInstallment && showInstallmentOption {
+                // Create installment plan for credit account purchases
+                guard let category = selectedCategory else {
+                    throw ValidationError.missingCategory
+                }
+
+                _ = try await recurringTransactionService.createInstallmentPlan(
+                    title: title.isEmpty ? (category.name ?? "Installment") : title,
+                    totalAmount: totalAmount,
+                    numberOfPayments: installmentPayments,
+                    account: account,
+                    category: category,
+                    subCategory: selectedSubCategory,
+                    merchant: merchant.isEmpty ? nil : merchant,
+                    notes: note.isEmpty ? nil : note,
+                    firstPaymentImmediate: true,
+                    billingDay: installmentBillingDay,
+                    annualInterestRate: 0 // No interest for simple installments
+                )
             } else {
                 // Regular transaction or split transaction
                 let transactionTitle: String
@@ -340,7 +384,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
 
                     // Update budgets
                     if let budgetService = budgetService {
-                        try await budgetService.updateBudgetsAfterTransaction(transaction)
+                        try await budgetService.updateBudgetsAfterTransaction(transaction.objectID)
                     }
                 }
             }

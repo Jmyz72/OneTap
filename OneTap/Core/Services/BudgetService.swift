@@ -2,8 +2,8 @@ import Foundation
 @preconcurrency internal import CoreData
 
 protocol BudgetServiceProtocol {
-    func checkBudgetStatus(for transaction: Transaction) async throws -> BudgetStatus
-    func updateBudgetsAfterTransaction(_ transaction: Transaction) async throws
+    func checkBudgetStatus(for transactionID: NSManagedObjectID) async throws -> BudgetStatus
+    func updateBudgetsAfterTransaction(_ transactionID: NSManagedObjectID) async throws
 }
 
 enum BudgetStatus {
@@ -15,17 +15,21 @@ enum BudgetStatus {
 
 class BudgetService: BudgetServiceProtocol {
     private let budgetRepository: BudgetRepositoryProtocol
-    private let transactionRepository: TransactionRepository
+    private let context: NSManagedObjectContext
 
     init(
         budgetRepository: BudgetRepositoryProtocol,
-        transactionRepository: TransactionRepository
+        context: NSManagedObjectContext
     ) {
         self.budgetRepository = budgetRepository
-        self.transactionRepository = transactionRepository
+        self.context = context
     }
 
-    func checkBudgetStatus(for transaction: Transaction) async throws -> BudgetStatus {
+    func checkBudgetStatus(for transactionID: NSManagedObjectID) async throws -> BudgetStatus {
+        guard let transaction = try? context.existingObject(with: transactionID) as? Transaction else {
+            return .noBudget
+        }
+
         guard let category = transaction.category,
               let date = transaction.date else {
             return .noBudget
@@ -48,7 +52,11 @@ class BudgetService: BudgetServiceProtocol {
         }
     }
 
-    func updateBudgetsAfterTransaction(_ transaction: Transaction) async throws {
+    func updateBudgetsAfterTransaction(_ transactionID: NSManagedObjectID) async throws {
+        guard let transaction = try? context.existingObject(with: transactionID) as? Transaction else {
+            return
+        }
+
         guard let category = transaction.category,
               let date = transaction.date else { return }
 

@@ -44,6 +44,7 @@ private struct AddTransactionContent: View {
     @State private var showingSplitSheet = false
     @State private var showingRecurringPicker = false
     @State private var showingRecurringConfigSheet = false
+    @State private var showingInstallmentSheet = false
 
     @FocusState private var focusedField: TransactionDetailsInput.Field?
 
@@ -106,6 +107,9 @@ private struct AddTransactionContent: View {
             }
             .sheet(isPresented: $showingRecurringConfigSheet) {
                 RecurringConfigSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showingInstallmentSheet) {
+                InstallmentConfigSheet(viewModel: viewModel)
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -211,6 +215,10 @@ private struct AddTransactionContent: View {
             note: $viewModel.note,
             isRecurring: $viewModel.isRecurring,
             frequency: $viewModel.frequency,
+            isInstallment: $viewModel.isInstallment,
+            showInstallmentOption: viewModel.showInstallmentOption,
+            installmentPayments: viewModel.installmentPayments,
+            formattedInstallmentPayment: viewModel.formattedInstallmentPayment,
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -221,7 +229,8 @@ private struct AddTransactionContent: View {
             onMerchantTap: { showingMerchantInput = true },
             onSplitTap: { showingSplitSheet = true },
             onNoteTap: { showingNoteInput = true },
-            onRecurringTap: { showingRecurringPicker = true }
+            onRecurringTap: { showingRecurringPicker = true },
+            onInstallmentTap: { showingInstallmentSheet = true }
         )
     }
 
@@ -698,6 +707,160 @@ private struct RecurringConfigSheet: View {
             }
         }
         .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Installment Configuration Sheet
+
+private struct InstallmentConfigSheet: View {
+    @ObservedObject var viewModel: AddTransactionViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppTheme.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Summary Card
+                        summaryCard
+
+                        // Number of Payments
+                        paymentsSection
+
+                        // Info Card
+                        infoCard
+                    }
+                    .padding(.vertical, 20)
+                }
+            }
+            .navigationTitle("Pay in Installments")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        viewModel.isInstallment = false
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Confirm") {
+                        viewModel.isInstallment = true
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .preferredColorScheme(.dark)
+    }
+
+    private var summaryCard: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Total Amount")
+                    .font(.system(size: 15))
+                    .foregroundColor(AppTheme.textSecondary)
+                Spacer()
+                Text(formattedTotal)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+            }
+
+            Divider()
+
+            HStack {
+                Text("Monthly Payment")
+                    .font(.system(size: 15))
+                    .foregroundColor(AppTheme.textSecondary)
+                Spacer()
+                Text(viewModel.formattedInstallmentPayment)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(AppTheme.accent)
+            }
+        }
+        .padding()
+        .background(AppTheme.secondaryBackground)
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+
+    private var formattedTotal: String {
+        let code = viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        return formatter.string(from: NSNumber(value: viewModel.totalAmount)) ?? "$0"
+    }
+
+    private var paymentsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Number of Payments")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary)
+                .textCase(.uppercase)
+                .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(viewModel.installmentOptions, id: \.self) { option in
+                        Button {
+                            viewModel.installmentPayments = option
+                        } label: {
+                            VStack(spacing: 4) {
+                                Text("\(option)")
+                                    .font(.system(size: 20, weight: .bold))
+                                Text("months")
+                                    .font(.system(size: 12))
+                            }
+                            .frame(width: 70, height: 70)
+                            .background(
+                                viewModel.installmentPayments == option
+                                    ? AppTheme.accent.opacity(0.2)
+                                    : AppTheme.secondaryBackground
+                            )
+                            .foregroundColor(
+                                viewModel.installmentPayments == option
+                                    ? AppTheme.accent
+                                    : AppTheme.textSecondary
+                            )
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        viewModel.installmentPayments == option
+                                            ? AppTheme.accent
+                                            : Color.clear,
+                                        lineWidth: 2
+                                    )
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private var infoCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 20))
+                .foregroundColor(AppTheme.accent)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("How it works")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+
+                Text("This will create an installment plan with \(viewModel.installmentPayments) monthly payments of \(viewModel.formattedInstallmentPayment). The first payment will be recorded immediately.")
+                    .font(.system(size: 14))
+                    .foregroundColor(AppTheme.textSecondary)
+            }
+        }
+        .padding()
+        .background(AppTheme.accent.opacity(0.1))
+        .cornerRadius(12)
+        .padding(.horizontal)
     }
 }
 

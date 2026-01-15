@@ -152,12 +152,34 @@ class BudgetRepository: BaseRepository, BudgetRepositoryProtocol {
     // MARK: - Publisher
 
     var budgetsPublisher: AnyPublisher<[Budget], Never> {
-        NotificationCenter.default
-            .publisher(for: .NSManagedObjectContextObjectsDidChange)
-            .compactMap { [weak self] _ in
-                try? self?.fetchAll()
+        let initial = (try? fetchAll()) ?? []
+        let subject = CurrentValueSubject<[Budget], Never>(initial)
+
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .sink { [weak self] notification in
+                guard let self = self else { return }
+
+                // Accept saves from any context with same persistent store
+                guard let savedContext = notification.object as? NSManagedObjectContext,
+                      savedContext.persistentStoreCoordinator === self.context.persistentStoreCoordinator else {
+                    return
+                }
+
+                // Check if Budget was changed
+                let inserted = notification.userInfo?[NSInsertedObjectsKey] as? Set<NSManagedObject> ?? []
+                let updated = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> ?? []
+                let deleted = notification.userInfo?[NSDeletedObjectsKey] as? Set<NSManagedObject> ?? []
+
+                let hasChanges = (inserted.union(updated).union(deleted))
+                    .contains { $0 is Budget }
+
+                guard hasChanges else { return }
+
+                let budgets = (try? self.fetchAll()) ?? []
+                subject.send(budgets)
             }
-            .prepend(try! fetchAll())
-            .eraseToAnyPublisher()
+            .store(in: &cancellables)
+
+        return subject.eraseToAnyPublisher()
     }
 }

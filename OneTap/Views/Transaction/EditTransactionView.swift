@@ -217,6 +217,10 @@ private struct EditTransactionContent: View {
             note: $viewModel.note,
             isRecurring: $viewModel.isRecurring,
             frequency: $viewModel.frequency,
+            isInstallment: .constant(false),
+            showInstallmentOption: false,
+            installmentPayments: 0,
+            formattedInstallmentPayment: "",
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -227,7 +231,8 @@ private struct EditTransactionContent: View {
             onMerchantTap: { showingMerchantInput = true },
             onSplitTap: { showingSplitSheet = true },
             onNoteTap: { showingNoteInput = true },
-            onRecurringTap: { showingRecurringPicker = true }
+            onRecurringTap: { showingRecurringPicker = true },
+            onInstallmentTap: { }
         )
     }
 
