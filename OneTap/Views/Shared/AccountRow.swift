@@ -10,45 +10,84 @@ import SwiftUI
 struct AccountRow: View {
     @ObservedObject var account: Account
 
+    private var savingsGoal: SavingsGoal? {
+        account.savingsGoal
+    }
+
     var body: some View {
-        HStack(spacing: 16) {
-            // Account Icon
-            AccountIconView(
-                iconName: account.icon ?? "creditcard.fill",
-                color: accountColor,
-                size: 24
-            )
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                // Account Icon
+                AccountIconView(
+                    iconName: account.icon ?? "creditcard.fill",
+                    color: accountColor,
+                    size: 24
+                )
 
-            // Account Info
-            VStack(alignment: .leading, spacing: 5) {
-                Text(account.name ?? "Unknown Account")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary)
+                // Account Info
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(account.name ?? "Unknown Account")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary)
 
-                HStack(spacing: 6) {
-                    Text(account.typeEnum.rawValue)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(AppTheme.textSecondary)
-
-                    if account.isLiability {
-                        Text("•")
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textTertiary)
-
-                        Text("Liability")
+                    HStack(spacing: 6) {
+                        Text(account.typeEnum.rawValue)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(AppTheme.expense)
+                            .foregroundColor(AppTheme.textSecondary)
+
+                        if account.isLiability {
+                            Text("•")
+                                .font(.system(size: 10))
+                                .foregroundColor(AppTheme.textTertiary)
+
+                            Text("Liability")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(AppTheme.expense)
+                        }
                     }
+                }
+
+                Spacer()
+
+                // Balance
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(formattedBalance)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(balanceColor)
                 }
             }
 
-            Spacer()
+            // Savings Goal Progress Bar
+            if let goal = savingsGoal {
+                VStack(spacing: 6) {
+                    // Progress bar
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(AppTheme.secondaryBackground)
+                                .frame(height: 6)
 
-            // Balance
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(formattedBalance)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(balanceColor)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(goalProgressColor(goal.progress))
+                                .frame(width: geometry.size.width * goal.progressClamped, height: 6)
+                        }
+                    }
+                    .frame(height: 6)
+
+                    // Progress text
+                    HStack {
+                        Text(goal.name ?? "Goal")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.textTertiary)
+
+                        Spacer()
+
+                        Text(goal.progressSummary)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(goalProgressColor(goal.progress))
+                    }
+                }
+                .padding(.top, 12)
             }
         }
         .padding(18)
@@ -74,5 +113,15 @@ struct AccountRow: View {
             return AppTheme.expense
         }
         return account.balance >= 0 ? AppTheme.income : AppTheme.expense
+    }
+
+    private func goalProgressColor(_ progress: Double) -> Color {
+        if progress >= 1.0 {
+            return AppTheme.income
+        } else if progress >= 0.7 {
+            return .orange
+        } else {
+            return AppTheme.accent
+        }
     }
 }

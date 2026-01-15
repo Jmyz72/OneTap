@@ -18,6 +18,7 @@
         <relationship name="recurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="account" inverseEntity="RecurringTransaction"/>
         <relationship name="toAccountPendingRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PendingRecurringTransaction" inverseName="toAccount" inverseEntity="PendingRecurringTransaction"/>
         <relationship name="toAccountRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="toAccount" inverseEntity="RecurringTransaction"/>
+        <relationship name="savingsGoal" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="SavingsGoal" inverseName="account" inverseEntity="SavingsGoal"/>
         <relationship name="transactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Transaction" inverseName="account" inverseEntity="Transaction"/>
     </entity>
     <entity name="Budget" representedClassName="Budget" syncable="YES" codeGenerationType="class">
@@ -119,6 +120,15 @@
         <relationship name="recurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="subCategory" inverseEntity="RecurringTransaction"/>
         <relationship name="transactionItems" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="TransactionItem" inverseName="subCategory" inverseEntity="TransactionItem"/>
         <relationship name="transactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Transaction" inverseName="subCategory" inverseEntity="Transaction"/>
+    </entity>
+    <entity name="SavingsGoal" representedClassName="SavingsGoal" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String"/>
+        <attribute name="targetAmount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="targetDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="account" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="savingsGoal" inverseEntity="Account"/>
     </entity>
     <entity name="Transaction" representedClassName="Transaction" syncable="YES" codeGenerationType="class">
         <attribute name="adjustmentReason" optional="YES" attributeType="String"/>
