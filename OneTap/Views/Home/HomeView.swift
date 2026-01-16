@@ -51,6 +51,7 @@ private struct HomeContent: View {
     @Binding var showingAddTransaction: Bool
     @Binding var showingAddAccount: Bool
     @Binding var showingScanReceipt: Bool
+    @State private var showingClaimsList = false
 
     var body: some View {
         NavigationStack {
@@ -71,6 +72,11 @@ private struct HomeContent: View {
                         // Needs Attention (combined alerts + approvals)
                         if viewModel.hasAlerts || viewModel.hasPendingRecurring {
                             needsAttentionSection
+                        }
+
+                        // Pending Claims
+                        if !viewModel.pendingClaims.isEmpty {
+                            claimsSection
                         }
 
                         // This Week (upcoming payments)
@@ -97,6 +103,9 @@ private struct HomeContent: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     ProfileButton()
                 }
+            }
+            .sheet(isPresented: $showingClaimsList) {
+                ClaimsListView()
             }
         }
     }
@@ -327,6 +336,15 @@ private struct HomeContent: View {
         .padding(14)
         .background(AppTheme.cardBackground)
         .cornerRadius(12)
+    }
+
+    // MARK: - Pending Claims
+
+    private var claimsSection: some View {
+        ClaimsWidget(
+            pendingClaims: viewModel.pendingClaims,
+            onTap: { showingClaimsList = true }
+        )
     }
 
     // MARK: - This Week

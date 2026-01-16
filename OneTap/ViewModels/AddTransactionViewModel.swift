@@ -48,6 +48,9 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     // Exclusion State
     @Published var excludeFromReports = false
 
+    // Claim State
+    @Published var markAsClaim = false
+
     // Data from repositories
     @Published var categories: [Category] = []
     @Published var accounts: [Account] = []
@@ -66,6 +69,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     private let transferService: TransferService
     private let balanceService: BalanceService
     private let validationService: ValidationService
+    private let claimService: ClaimService
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -76,7 +80,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         recurringTransactionService: RecurringTransactionService,
         transferService: TransferService,
         balanceService: BalanceService,
-        validationService: ValidationService
+        validationService: ValidationService,
+        claimService: ClaimService
     ) {
         self.transactionRepository = transactionRepository
         self.accountRepository = accountRepository
@@ -86,6 +91,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
         self.transferService = transferService
         self.balanceService = balanceService
         self.validationService = validationService
+        self.claimService = claimService
 
         observeData()
         setupDefaults()
@@ -387,6 +393,11 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                     }
 
                     try transactionRepository.save()
+
+                    // Create claim if marked as claim (only for expenses)
+                    if markAsClaim && selectedType == .expense {
+                        _ = try claimService.createClaim(from: transaction)
+                    }
 
                     // Recalculate balance
                     try await balanceService.recalculateBalances(for: account.objectID, from: transactionDate)

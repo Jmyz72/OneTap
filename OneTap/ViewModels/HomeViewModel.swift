@@ -25,6 +25,9 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     @Published var upcomingRecurring: [RecurringTransaction] = []
     @Published var pendingRecurringTransactions: [PendingRecurringTransaction] = []
 
+    // Claims
+    @Published var pendingClaims: [Claim] = []
+
     // Today's activity
     @Published var todayIncome: Double = 0
     @Published var todayExpense: Double = 0
@@ -43,6 +46,7 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     private let budgetRepository: BudgetRepository
     private let recurringTransactionRepository: RecurringTransactionRepository
     private let pendingRecurringRepository: PendingRecurringRepository
+    private let claimRepository: ClaimRepository
     private let balanceService: BalanceService
     private var cancellables = Set<AnyCancellable>()
 
@@ -52,6 +56,7 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         budgetRepository: BudgetRepository,
         recurringTransactionRepository: RecurringTransactionRepository,
         pendingRecurringRepository: PendingRecurringRepository,
+        claimRepository: ClaimRepository,
         balanceService: BalanceService
     ) {
         self.accountRepository = accountRepository
@@ -59,6 +64,7 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         self.budgetRepository = budgetRepository
         self.recurringTransactionRepository = recurringTransactionRepository
         self.pendingRecurringRepository = pendingRecurringRepository
+        self.claimRepository = claimRepository
         self.balanceService = balanceService
 
         setupObservers()
@@ -167,6 +173,9 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
 
         // Get savings goals
         fetchSavingsGoals()
+
+        // Get pending claims
+        fetchPendingClaims()
 
         loadingState = .loaded
     }
@@ -371,6 +380,10 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         let sortDescriptors = [NSSortDescriptor(keyPath: \PendingRecurringTransaction.scheduledDate, ascending: true)]
         let pending = pendingRecurringRepository.fetch(sortDescriptors: sortDescriptors)
         pendingRecurringTransactions = Array(pending.prefix(10))
+    }
+
+    private func fetchPendingClaims() {
+        pendingClaims = claimRepository.fetchPendingClaims()
     }
 
     var hasPendingRecurring: Bool {

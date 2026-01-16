@@ -217,6 +217,7 @@ private struct AddTransactionContent: View {
             installmentPayments: viewModel.installmentPayments,
             formattedInstallmentPayment: viewModel.formattedInstallmentPayment,
             excludeFromReports: $viewModel.excludeFromReports,
+            markAsClaim: $viewModel.markAsClaim,
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -229,7 +230,8 @@ private struct AddTransactionContent: View {
             onNoteTap: { showingNoteInput = true },
             onRecurringTap: { showingRecurringPresetSheet = true },
             onInstallmentTap: { showingInstallmentSheet = true },
-            onExclusionTap: { viewModel.excludeFromReports.toggle() }
+            onExclusionTap: { viewModel.excludeFromReports.toggle() },
+            onClaimTap: { viewModel.markAsClaim.toggle() }
         )
     }
 

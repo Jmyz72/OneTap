@@ -20,6 +20,7 @@
         <relationship name="toAccountRecurringTransactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="RecurringTransaction" inverseName="toAccount" inverseEntity="RecurringTransaction"/>
         <relationship name="savingsGoal" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="SavingsGoal" inverseName="account" inverseEntity="SavingsGoal"/>
         <relationship name="transactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Transaction" inverseName="account" inverseEntity="Transaction"/>
+        <relationship name="claims" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Claim" inverseName="account" inverseEntity="Claim"/>
     </entity>
     <entity name="Budget" representedClassName="Budget" syncable="YES" codeGenerationType="class">
         <attribute name="amount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
@@ -44,6 +45,7 @@
         <relationship name="subCategories" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="SubCategory" inverseName="category" inverseEntity="SubCategory"/>
         <relationship name="transactionItems" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="TransactionItem" inverseName="category" inverseEntity="TransactionItem"/>
         <relationship name="transactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Transaction" inverseName="category" inverseEntity="Transaction"/>
+        <relationship name="claims" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Claim" inverseName="category" inverseEntity="Claim"/>
     </entity>
     <entity name="RecurringTransaction" representedClassName="RecurringTransaction" syncable="YES" codeGenerationType="class">
         <attribute name="amount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
@@ -165,5 +167,26 @@
         <relationship name="category" maxCount="1" deletionRule="Nullify" destinationEntity="Category" inverseName="transactionItems" inverseEntity="Category"/>
         <relationship name="subCategory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SubCategory" inverseName="transactionItems" inverseEntity="SubCategory"/>
         <relationship name="transaction" maxCount="1" deletionRule="Nullify" destinationEntity="Transaction" inverseName="items" inverseEntity="Transaction"/>
+    </entity>
+    <entity name="Claim" representedClassName="Claim" syncable="YES" codeGenerationType="class">
+        <attribute name="adjustmentTransactionID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="amount" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="originalTransactionID" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="reimbursementTransactionID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="settledDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="status" attributeType="String" defaultValueString="pending"/>
+        <attribute name="submittedDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="account" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="claims" inverseEntity="Account"/>
+        <relationship name="category" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Category" inverseName="claims" inverseEntity="Category"/>
+        <fetchIndex name="byStatus">
+            <fetchIndexElement property="status" type="Binary" order="ascending"/>
+        </fetchIndex>
+        <fetchIndex name="bySubmittedDate">
+            <fetchIndexElement property="submittedDate" type="Binary" order="descending"/>
+        </fetchIndex>
     </entity>
 </model>

@@ -27,6 +27,9 @@ struct TransactionMiddleBar: View {
     // Exclusion State
     @Binding var excludeFromReports: Bool
 
+    // Claim State
+    @Binding var markAsClaim: Bool
+
     let selectedType: TransactionType
 
     // Actions
@@ -38,7 +41,8 @@ struct TransactionMiddleBar: View {
     let onRecurringTap: () -> Void
     let onInstallmentTap: () -> Void
     let onExclusionTap: () -> Void
-    
+    let onClaimTap: () -> Void
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
@@ -80,6 +84,17 @@ struct TransactionMiddleBar: View {
                         text: "Exclude",
                         isActive: excludeFromReports
                     )
+                }
+
+                // Claim Chip (Expense only)
+                if selectedType == .expense {
+                    Button(action: onClaimTap) {
+                        chipView(
+                            icon: "checkmark.circle.fill",
+                            text: "Claim",
+                            isActive: markAsClaim
+                        )
+                    }
                 }
 
                 // Installment Chip (Credit accounts only)
