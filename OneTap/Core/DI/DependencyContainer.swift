@@ -26,6 +26,7 @@ final class DependencyContainer: ObservableObject {
     let budgetRepository: BudgetRepository
     let pendingRecurringRepository: PendingRecurringRepository
     let savingsGoalRepository: SavingsGoalRepository
+    let claimRepository: ClaimRepository
 
     // MARK: - Services
     let balanceService: BalanceService
@@ -33,6 +34,7 @@ final class DependencyContainer: ObservableObject {
     let validationService: ValidationService
     let recurringTransactionService: RecurringTransactionService
     let budgetService: BudgetService
+    let claimService: ClaimService
 
     init(persistenceController: PersistenceController? = nil) {
         let pc = persistenceController ?? PersistenceController.shared
@@ -47,6 +49,7 @@ final class DependencyContainer: ObservableObject {
         self.budgetRepository = BudgetRepository(context: context)
         self.pendingRecurringRepository = PendingRecurringRepository(context: context)
         self.savingsGoalRepository = SavingsGoalRepository(context: context)
+        self.claimRepository = ClaimRepository(context: context)
 
         // Initialize services
         self.balanceService = BalanceService(container: pc.container)
@@ -65,6 +68,11 @@ final class DependencyContainer: ObservableObject {
             budgetRepository: budgetRepository,
             context: context
         )
+        self.claimService = ClaimService(
+            claimRepository: claimRepository,
+            transactionRepository: transactionRepository,
+            balanceService: balanceService
+        )
     }
 
     // MARK: - ViewModel Factories
@@ -78,7 +86,8 @@ final class DependencyContainer: ObservableObject {
             recurringTransactionService: recurringTransactionService,
             transferService: transferService,
             balanceService: balanceService,
-            validationService: validationService
+            validationService: validationService,
+            claimService: claimService
         )
     }
 
@@ -188,7 +197,16 @@ final class DependencyContainer: ObservableObject {
             budgetRepository: budgetRepository,
             recurringTransactionRepository: recurringTransactionRepository,
             pendingRecurringRepository: pendingRecurringRepository,
+            claimRepository: claimRepository,
             balanceService: balanceService
+        )
+    }
+
+    func makeClaimsListViewModel() -> ClaimsListViewModel {
+        ClaimsListViewModel(
+            claimRepository: claimRepository,
+            claimService: claimService,
+            accountRepository: accountRepository
         )
     }
 }
