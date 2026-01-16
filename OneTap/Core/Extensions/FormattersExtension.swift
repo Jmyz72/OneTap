@@ -68,4 +68,16 @@ struct Formatters {
         formatter.dateFormat = "MMMM yyyy"
         return formatter
     }()
+
+    static let dateOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd/yyyy"
+        return formatter
+    }()
+
+    static let timeOnly: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
 }

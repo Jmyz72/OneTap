@@ -226,12 +226,8 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
             let finalAmount = splitItems.isEmpty ? newAmount : splitItems.reduce(0) { $0 + $1.amount }
 
             // Prepare title
-            let transactionTitle: String
-            if !splitItems.isEmpty {
-                transactionTitle = "Split Transaction (\(splitItems.count) Items)"
-            } else {
-                transactionTitle = title
-            }
+            // Use the user's entered title regardless of split items
+            let transactionTitle: String = title
 
             // Update main transaction
             let updateData = TransactionUpdateData(

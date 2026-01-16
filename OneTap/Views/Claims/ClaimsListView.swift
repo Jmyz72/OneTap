@@ -220,7 +220,7 @@ struct ClaimRow: View {
                             .fill(category.colorView.opacity(0.2))
                             .frame(width: 40, height: 40)
 
-                        Image(systemName: category.iconName ?? "tag.fill")
+                        Image(systemName: category.iconName)
                             .foregroundColor(category.colorView)
                     }
                 }
