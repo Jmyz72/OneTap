@@ -210,9 +210,17 @@ class BalanceService: BalanceServiceProtocol {
             return amount
 
         case .transfer:
-            // In our model, a Transfer transaction on this account means money leaving.
-            // The incoming side is created as a separate 'Income' transaction on the other account.
-            return balance - amount
+            // Transfer transactions can be either outgoing or incoming
+            // Check the title to determine direction:
+            // "Transfer to X" = outgoing (decreases balance)
+            // "Transfer from X" = incoming (increases balance)
+            if let title = transaction.title, title.hasPrefix("Transfer from") {
+                // Incoming transfer - increases balance
+                return balance + amount
+            } else {
+                // Outgoing transfer - decreases balance
+                return balance - amount
+            }
         }
     }
 }

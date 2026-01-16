@@ -1,8 +1,8 @@
 //
-//  AddInstallmentPlanViewModel.swift
+//  EditInstallmentPlanViewModel.swift
 //  OneTap
 //
-//  ViewModel for creating new installment plans
+//  ViewModel for editing existing installment plans
 //
 
 import Foundation
@@ -11,16 +11,13 @@ import Combine
 @preconcurrency internal import CoreData
 
 @MainActor
-class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
+class EditInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
     // MARK: - Published State
     @Published var title = ""
     @Published var merchant = ""
     @Published var totalAmountString = ""
     @Published var numberOfPayments: Int16 = 12
     @Published var billingDay: Int16 = 1
-    @Published var firstPaymentImmediate = true
-    @Published var selectedAccount: Account?
-    @Published var selectedCategory: Category?
     @Published var notes = ""
 
     // Interest support
@@ -33,14 +30,17 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
     @Published var useAccountBillingDates: Bool = true
     @Published var customBillingDay: Int16 = 1
     @Published var customDueDay: Int16 = 10
-    @Published var useCustomStartDate: Bool = false
-    @Published var customStartDate: Date = Date()
 
     @Published var accounts: [Account] = []
     @Published var expenseCategories: [Category] = []
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
+
+    // MARK: - Properties
+    let plan: RecurringTransaction
+    var selectedAccount: Account? { plan.account }
+    var selectedCategory: Category? { plan.category }
 
     // MARK: - Dependencies
     private let recurringTransactionService: RecurringTransactionService
@@ -50,17 +50,20 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
     private var cancellables = Set<AnyCancellable>()
 
     init(
+        plan: RecurringTransaction,
         recurringTransactionService: RecurringTransactionService,
         accountRepository: AccountRepository,
         categoryRepository: CategoryRepository,
         validationService: ValidationService
     ) {
+        self.plan = plan
         self.recurringTransactionService = recurringTransactionService
         self.accountRepository = accountRepository
         self.categoryRepository = categoryRepository
         self.validationService = validationService
 
         setupData()
+        loadPlanData()
     }
 
     deinit {
@@ -77,7 +80,25 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
     var annualInterestRate: Double {
         guard hasInterest else { return 0 }
         let percentage = Double(aprPercentage) ?? 0
-        return percentage / 100.0  // Convert percentage to decimal (15% -> 0.15)
+        return percentage / 100.0
+    }
+
+    var customRollingDays: Int16 {
+        Int16(customRollingDaysString) ?? 30
+    }
+
+    var effectiveBillingDay: Int16 {
+        if paymentCycleType == .consolidated {
+            return useAccountBillingDates ? (selectedAccount?.billingDate ?? 1) : customBillingDay
+        }
+        return billingDay
+    }
+
+    var effectiveDueDay: Int16 {
+        if paymentCycleType == .consolidated {
+            return useAccountBillingDates ? (selectedAccount?.dueDate ?? 10) : customDueDay
+        }
+        return 0
     }
 
     var monthlyPayment: Double {
@@ -85,14 +106,12 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
         guard totalAmount > 0 else { return 0 }
 
         if hasInterest && annualInterestRate > 0 {
-            // Use amortization formula for interest-bearing installments
             return RecurringTransaction.calculateMonthlyPayment(
                 principal: totalAmount,
                 apr: annualInterestRate,
                 months: numberOfPayments
             )
         } else {
-            // Simple division for 0% APR
             return totalAmount / Double(numberOfPayments)
         }
     }
@@ -127,48 +146,10 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
         return nil
     }
 
-    var customRollingDays: Int16 {
-        Int16(customRollingDaysString) ?? 30
-    }
-
-    var effectiveBillingDay: Int16 {
-        if paymentCycleType == .consolidated {
-            return useAccountBillingDates ? (selectedAccount?.billingDate ?? 1) : customBillingDay
-        }
-        return billingDay
-    }
-
-    var effectiveDueDay: Int16 {
-        if paymentCycleType == .consolidated {
-            return useAccountBillingDates ? (selectedAccount?.dueDate ?? 10) : customDueDay
-        }
-        return 0
-    }
-
-    var effectiveStartDate: Date {
-        useCustomStartDate ? customStartDate : Date()
-    }
-
-    var projectedPaymentDates: [Date] {
-        guard totalAmount > 0, numberOfPayments > 1 else { return [] }
-
-        var dates: [Date] = []
-        var currentDate = calculateInitialDate()
-
-        for _ in 0..<min(numberOfPayments, 5) {
-            dates.append(currentDate)
-            currentDate = calculateNextDate(from: currentDate)
-        }
-
-        return dates
-    }
-
     var isValid: Bool {
         !title.isEmpty &&
         totalAmount > 0 &&
-        numberOfPayments > 1 &&
-        selectedAccount != nil &&
-        selectedCategory != nil
+        numberOfPayments > 1
     }
 
     // MARK: - Setup
@@ -181,9 +162,6 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
                 receiveCompletion: { _ in },
                 receiveValue: { [weak self] accounts in
                     self?.accounts = accounts
-                    if self?.selectedAccount == nil {
-                        self?.selectedAccount = accounts.first
-                    }
                 }
             )
             .store(in: &cancellables)
@@ -202,117 +180,48 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
         // Initial fetch
         accounts = accountRepository.fetchAccounts(group: nil)
         expenseCategories = categoryRepository.fetchCategories(type: .expense)
-        selectedAccount = accounts.first
+    }
+
+    private func loadPlanData() {
+        // Load basic fields
+        title = plan.title ?? ""
+        merchant = plan.merchant ?? ""
+        notes = plan.notes ?? ""
+        totalAmountString = String(format: "%.2f", plan.totalAmount)
+        numberOfPayments = plan.occurrenceLimit
+
+        // Load interest data
+        hasInterest = plan.hasInterest
+        if hasInterest {
+            aprPercentage = String(format: "%.1f", plan.interestRate * 100)
+        }
+
+        // Load payment cycle type
+        paymentCycleType = plan.paymentCycleTypeEnum
+
+        switch paymentCycleType {
+        case .monthlyFixed:
+            billingDay = plan.monthlyDay
+
+        case .weekly, .biweekly:
+            // Fixed values, no additional config needed
+            break
+
+        case .rolling:
+            customRollingDaysString = String(plan.rollingCycleDays)
+
+        case .consolidated:
+            if plan.overrideBillingDay > 0 {
+                useAccountBillingDates = false
+                customBillingDay = plan.overrideBillingDay
+                customDueDay = plan.overrideDueDay
+            } else {
+                useAccountBillingDates = true
+            }
+        }
     }
 
     // MARK: - Actions
-
-    private func calculateInitialDate() -> Date {
-        let calendar = Calendar.current
-        let startDate = effectiveStartDate
-
-        switch paymentCycleType {
-        case .monthlyFixed:
-            if firstPaymentImmediate && !useCustomStartDate {
-                return startDate
-            }
-            return calculateNextBillingDate(from: startDate, billingDay: effectiveBillingDay)
-
-        case .weekly:
-            if firstPaymentImmediate && !useCustomStartDate {
-                return startDate
-            }
-            return calendar.date(byAdding: .day, value: 7, to: startDate) ?? startDate
-
-        case .biweekly:
-            if firstPaymentImmediate && !useCustomStartDate {
-                return startDate
-            }
-            return calendar.date(byAdding: .day, value: 14, to: startDate) ?? startDate
-
-        case .rolling:
-            if firstPaymentImmediate && !useCustomStartDate {
-                return startDate
-            }
-            return calendar.date(byAdding: .day, value: Int(customRollingDays), to: startDate) ?? startDate
-
-        case .consolidated:
-            // Consolidated billing always waits for next cycle
-            let nextBilling = calculateNextBillingDate(from: startDate, billingDay: effectiveBillingDay)
-            var billingComponents = calendar.dateComponents([.year, .month], from: nextBilling)
-            billingComponents.day = Int(effectiveBillingDay)
-            billingComponents.hour = 0
-            billingComponents.minute = 0
-
-            var dueComponents = billingComponents
-            dueComponents.day = Int(effectiveDueDay)
-
-            if effectiveDueDay < effectiveBillingDay {
-                dueComponents.month = (dueComponents.month ?? 1) + 1
-            }
-
-            return calendar.date(from: dueComponents) ?? nextBilling
-        }
-    }
-
-    private func calculateNextDate(from date: Date) -> Date {
-        let calendar = Calendar.current
-
-        switch paymentCycleType {
-        case .monthlyFixed:
-            return calculateNextBillingDate(from: date, billingDay: effectiveBillingDay)
-
-        case .weekly:
-            return calendar.date(byAdding: .day, value: 7, to: date) ?? date
-
-        case .biweekly:
-            return calendar.date(byAdding: .day, value: 14, to: date) ?? date
-
-        case .rolling:
-            return calendar.date(byAdding: .day, value: Int(customRollingDays), to: date) ?? date
-
-        case .consolidated:
-            let nextBilling = calculateNextBillingDate(from: date, billingDay: effectiveBillingDay)
-            var billingComponents = calendar.dateComponents([.year, .month], from: nextBilling)
-            billingComponents.day = Int(effectiveBillingDay)
-            billingComponents.hour = 0
-            billingComponents.minute = 0
-
-            var dueComponents = billingComponents
-            dueComponents.day = Int(effectiveDueDay)
-
-            if effectiveDueDay < effectiveBillingDay {
-                dueComponents.month = (dueComponents.month ?? 1) + 1
-            }
-
-            return calendar.date(from: dueComponents) ?? nextBilling
-        }
-    }
-
-    private func calculateNextBillingDate(from date: Date, billingDay: Int16) -> Date {
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month], from: date)
-
-        // Special case: billing day 0 means last day of month
-        if billingDay == 0 {
-            components.month = (components.month ?? 1) + 1
-            components.day = 0  // Day 0 = last day of previous month
-            return calendar.date(from: components) ?? date
-        }
-
-        components.day = Int(billingDay)
-
-        guard var nextDate = calendar.date(from: components) else {
-            return date
-        }
-
-        // If calculated date is before current date, move to next month
-        if nextDate <= date {
-            nextDate = calendar.date(byAdding: .month, value: 1, to: nextDate) ?? nextDate
-        }
-
-        return nextDate
-    }
 
     private func validateCycleConfiguration() throws {
         switch paymentCycleType {
@@ -322,11 +231,9 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
             }
 
         case .weekly, .biweekly:
-            // Fixed values, no validation needed
             break
 
         case .rolling:
-            // Validate custom rolling days
             guard customRollingDays >= 1 && customRollingDays <= 365 else {
                 throw ServiceError.validationFailed("Rolling cycle days must be between 1 and 365")
             }
@@ -353,18 +260,10 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
         }
     }
 
-    func createInstallmentPlan() async {
+    func updateInstallmentPlan() async {
         loadingState = .loading
 
         do {
-            guard let account = selectedAccount else {
-                throw ValidationError.missingAccount
-            }
-
-            guard let category = selectedCategory else {
-                throw ValidationError.missingCategory
-            }
-
             guard totalAmount > 0 else {
                 throw ValidationError.invalidAmount
             }
@@ -376,23 +275,18 @@ class AddInstallmentPlanViewModel: ObservableObject, ViewModelProtocol {
             // Validate cycle-specific configuration
             try validateCycleConfiguration()
 
-            // Create installment plan with cycle type
-            _ = try await recurringTransactionService.createInstallmentPlan(
+            // Update installment plan
+            try await recurringTransactionService.updateInstallmentPlan(
+                plan,
                 title: title,
-                totalAmount: totalAmount,
-                numberOfPayments: numberOfPayments,
-                account: account,
-                category: category,
-                subCategory: nil,
                 merchant: merchant.isEmpty ? nil : merchant,
                 notes: notes.isEmpty ? nil : notes,
-                firstPaymentImmediate: firstPaymentImmediate,
                 paymentCycleType: paymentCycleType,
                 monthlyFixedDay: paymentCycleType == .monthlyFixed ? billingDay : nil,
                 rollingCycleDays: paymentCycleType == .rolling ? customRollingDays : nil,
                 overrideBillingDay: paymentCycleType == .consolidated && !useAccountBillingDates ? customBillingDay : nil,
                 overrideDueDay: paymentCycleType == .consolidated && !useAccountBillingDates ? customDueDay : nil,
-                startDate: effectiveStartDate,
+                numberOfPayments: numberOfPayments,
                 annualInterestRate: annualInterestRate
             )
 

@@ -113,6 +113,65 @@ class RecurringTransactionRepository: BaseRepository {
         return recurring
     }
 
+    func updateInstallmentPlan(
+        _ plan: RecurringTransaction,
+        title: String?,
+        merchant: String?,
+        notes: String?,
+        paymentCycleType: PaymentCycleType,
+        monthlyFixedDay: Int16?,
+        rollingCycleDays: Int16?,
+        overrideBillingDay: Int16?,
+        overrideDueDay: Int16?,
+        numberOfPayments: Int16,
+        annualInterestRate: Double
+    ) throws {
+        // Update basic fields
+        plan.title = title
+        plan.merchant = merchant
+        plan.notes = notes
+        plan.updatedAt = Date()
+
+        // Update payment cycle configuration
+        plan.paymentCycleType = paymentCycleType.rawValue
+
+        switch paymentCycleType {
+        case .monthlyFixed:
+            plan.monthlyDay = monthlyFixedDay ?? 1
+
+        case .weekly:
+            plan.rollingCycleDays = 7
+
+        case .biweekly:
+            plan.rollingCycleDays = 14
+
+        case .rolling:
+            plan.rollingCycleDays = rollingCycleDays ?? 30
+
+        case .consolidated:
+            plan.overrideBillingDay = overrideBillingDay ?? 0
+            plan.overrideDueDay = overrideDueDay ?? 0
+        }
+
+        // Update occurrence limit (total number of payments)
+        plan.occurrenceLimit = numberOfPayments
+
+        // Update interest rate
+        plan.interestRate = annualInterestRate
+        plan.hasInterest = annualInterestRate > 0
+
+        // Recalculate payment amount if interest rate changed
+        if plan.hasInterest && annualInterestRate > 0 {
+            plan.amount = RecurringTransaction.calculateMonthlyPayment(
+                principal: plan.totalAmount,
+                apr: annualInterestRate,
+                months: numberOfPayments
+            )
+        } else {
+            plan.amount = plan.totalAmount / Double(numberOfPayments)
+        }
+    }
+
     // MARK: - Fetch Operations
 
     func fetch(predicate: NSPredicate? = nil, sortDescriptors: [NSSortDescriptor] = []) -> [RecurringTransaction] {

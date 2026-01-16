@@ -41,7 +41,7 @@ private struct EditTransactionContent: View {
     @State private var showingNoteInput = false
     @State private var showingMerchantInput = false
     @State private var showingSplitSheet = false
-    @State private var showingRecurringPicker = false
+    @State private var showingRecurringPresetSheet = false
 
     @FocusState private var focusedField: TransactionDetailsInput.Field?
 
@@ -77,23 +77,11 @@ private struct EditTransactionContent: View {
                 TextField("Note", text: $viewModel.note)
                 Button("Done") { }
             }
-            .alert("Add Merchant", isPresented: $showingMerchantInput) {
-                TextField("Merchant Name", text: $viewModel.merchant)
-                Button("Done") { }
+            .sheet(isPresented: $showingMerchantInput) {
+                MerchantPickerSheet(viewModel: viewModel)
             }
-            .confirmationDialog("Recurring Frequency", isPresented: $showingRecurringPicker, titleVisibility: .visible) {
-                ForEach(viewModel.frequencies, id: \.self) { freq in
-                    Button(freq) {
-                        viewModel.frequency = freq
-                        viewModel.isRecurring = true
-                    }
-                }
-                if viewModel.isRecurring {
-                    Button("Remove Recurring", role: .destructive) {
-                        viewModel.isRecurring = false
-                    }
-                }
-                Button("Cancel", role: .cancel) { }
+            .sheet(isPresented: $showingRecurringPresetSheet) {
+                RecurringPresetSheet(viewModel: viewModel)
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -232,7 +220,7 @@ private struct EditTransactionContent: View {
             onMerchantTap: { showingMerchantInput = true },
             onSplitTap: { showingSplitSheet = true },
             onNoteTap: { showingNoteInput = true },
-            onRecurringTap: { showingRecurringPicker = true },
+            onRecurringTap: { showingRecurringPresetSheet = true },
             onInstallmentTap: { },
             onExclusionTap: { viewModel.excludeFromReports.toggle() },
             onClaimTap: { viewModel.markAsClaim.toggle() }

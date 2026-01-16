@@ -73,6 +73,10 @@
         <attribute name="type" attributeType="String" defaultValueString="Expense"/>
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="weeklyDays" optional="YES" attributeType="String"/>
+        <attribute name="paymentCycleType" attributeType="String" defaultValueString="monthlyFixed"/>
+        <attribute name="rollingCycleDays" optional="YES" attributeType="Integer 16" defaultValueString="30" usesScalarValueType="YES"/>
+        <attribute name="overrideBillingDay" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="overrideDueDay" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="account" maxCount="1" deletionRule="Nullify" destinationEntity="Account" inverseName="recurringTransactions" inverseEntity="Account"/>
         <relationship name="category" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Category" inverseName="recurringTransactions" inverseEntity="Category"/>
         <relationship name="items" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RecurringTransactionItem" inverseName="recurringTransaction" inverseEntity="RecurringTransactionItem"/>

@@ -26,10 +26,10 @@ enum TransactionType: String, CaseIterable, Identifiable {
     
     var color: Color {
         switch self {
-        case .expense: return .red
-        case .income: return .green
-        case .transfer: return .blue
-        case .adjustment: return .gray
+        case .expense: return AppTheme.expense
+        case .income: return AppTheme.income
+        case .transfer: return AppTheme.transfer
+        case .adjustment: return AppTheme.adjustment
         }
     }
 }
@@ -154,6 +154,20 @@ extension Transaction {
     var hasSettledClaim: Bool {
         guard let claim = claim else { return false }
         return claim.statusEnum == .settled
+    }
+
+    // MARK: - Transfer Helpers
+
+    /// Returns true if this is the destination side of a transfer (incoming transfer)
+    var isTransferDestination: Bool {
+        guard typeEnum == .transfer else { return false }
+        return title?.hasPrefix("Transfer from") ?? false
+    }
+
+    /// Returns true if this is the source side of a transfer (outgoing transfer)
+    var isTransferSource: Bool {
+        guard typeEnum == .transfer else { return false }
+        return title?.hasPrefix("Transfer to") ?? false
     }
 }
 

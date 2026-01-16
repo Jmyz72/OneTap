@@ -307,7 +307,7 @@ struct TransactionDetailView: View {
                         .foregroundColor(.gray)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 12)
             }
 
             // Adjustment Reason if present
@@ -321,7 +321,7 @@ struct TransactionDetailView: View {
                         .foregroundColor(.gray)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 12)
             }
         }
     }
@@ -357,35 +357,35 @@ struct TransactionDetailView: View {
 
     private func receiptFooter() -> some View {
         VStack(spacing: 8) {
-            // Special badges
+            // All badges centered together
             HStack(spacing: 12) {
+                // Type badge
+                TransactionTypeBadge(type: transaction.typeEnum)
+
+                if transaction.recurringTransaction != nil {
+                    receiptBadge(icon: "repeat", text: "RECURRING", color: AppTheme.recurring)
+                }
+
                 if transaction.isPartOfInstallment {
-                    receiptBadge(icon: "creditcard.fill", text: "INSTALLMENT", color: .purple)
-                }
-
-                if transaction.typeEnum == .transfer {
-                    receiptBadge(icon: "arrow.left.arrow.right", text: "TRANSFER", color: .blue)
-                }
-
-                if transaction.excludeFromReports {
-                    receiptBadge(icon: "eye.slash", text: "EXCLUDED", color: .orange)
+                    receiptBadge(icon: "creditcard.fill", text: "INSTALLMENT", color: AppTheme.installment)
                 }
 
                 if transaction.hasPendingClaim {
-                    receiptBadge(icon: "checkmark.circle.fill", text: "CLAIM PENDING", color: .orange)
+                    receiptBadge(icon: "checkmark.circle.fill", text: "CLAIM PENDING", color: AppTheme.claimPending)
                 }
 
                 if transaction.hasSettledClaim {
-                    receiptBadge(icon: "checkmark.circle.fill", text: "CLAIM SETTLED", color: .green)
+                    receiptBadge(icon: "checkmark.circle.fill", text: "CLAIM SETTLED", color: AppTheme.claimSettled)
                 }
 
-                if transaction.typeEnum == .adjustment {
-                    receiptBadge(icon: "slider.horizontal.3", text: "ADJUSTMENT", color: .yellow)
+                if transaction.excludeFromReports {
+                    receiptBadge(icon: "eye.slash", text: "EXCLUDED", color: AppTheme.excluded)
                 }
             }
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
 
-            if transaction.isPartOfInstallment || transaction.typeEnum == .transfer || transaction.excludeFromReports || transaction.hasPendingClaim || transaction.hasSettledClaim || transaction.typeEnum == .adjustment {
+            if transaction.recurringTransaction != nil || transaction.isPartOfInstallment || transaction.excludeFromReports || transaction.hasPendingClaim || transaction.hasSettledClaim {
                 Divider()
                     .background(Color.white.opacity(0.1))
                     .padding(.vertical, 4)

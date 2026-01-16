@@ -173,8 +173,8 @@ final class DependencyContainer: ObservableObject {
         SettingsViewModel(persistenceController: persistenceController)
     }
     
-    func makeRecurringTransactionsListViewModel() -> RecurringTransactionsListViewModel {
-        RecurringTransactionsListViewModel(repository: recurringTransactionRepository)
+    func makeRecurringTransactionsListViewModel(showInstallments: Bool = false) -> RecurringTransactionsListViewModel {
+        RecurringTransactionsListViewModel(repository: recurringTransactionRepository, showInstallments: showInstallments)
     }
 
     func makeInstallmentDetailViewModel(plan: RecurringTransaction) -> InstallmentDetailViewModel {
@@ -187,6 +187,16 @@ final class DependencyContainer: ObservableObject {
 
     func makeAddInstallmentPlanViewModel() -> AddInstallmentPlanViewModel {
         AddInstallmentPlanViewModel(
+            recurringTransactionService: recurringTransactionService,
+            accountRepository: accountRepository,
+            categoryRepository: categoryRepository,
+            validationService: validationService
+        )
+    }
+
+    func makeEditInstallmentPlanViewModel(plan: RecurringTransaction) -> EditInstallmentPlanViewModel {
+        EditInstallmentPlanViewModel(
+            plan: plan,
             recurringTransactionService: recurringTransactionService,
             accountRepository: accountRepository,
             categoryRepository: categoryRepository,

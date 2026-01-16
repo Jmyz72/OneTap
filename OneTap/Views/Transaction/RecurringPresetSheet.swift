@@ -7,8 +7,20 @@
 
 import SwiftUI
 
-struct RecurringPresetSheet: View {
-    @ObservedObject var viewModel: AddTransactionViewModel
+// Protocol for view models that support recurring configuration
+protocol RecurringPickerViewModel: ObservableObject {
+    var isRecurring: Bool { get set }
+    var frequency: String { get set }
+    var interval: Int { get set }
+    var transactionDate: Date { get }
+    var selectedWeekdays: Set<Int> { get set }
+    var selectedMonthDay: Int { get set }
+    var hasEndDate: Bool { get set }
+    var hasOccurrenceLimit: Bool { get set }
+}
+
+struct RecurringPresetSheet<ViewModel: RecurringPickerViewModel>: View {
+    @ObservedObject var viewModel: ViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -25,12 +37,6 @@ struct RecurringPresetSheet: View {
 
                         // Quick Presets Section
                         quickPresetsSection
-
-                        Divider()
-                            .padding(.horizontal)
-
-                        // Custom Configuration Button
-                        customConfigButton
 
                         // Remove Recurring (if already set)
                         if viewModel.isRecurring {
@@ -67,24 +73,14 @@ struct RecurringPresetSheet: View {
                     .textCase(.uppercase)
             }
 
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(recurringDescription)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppTheme.textPrimary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recurringDescription)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppTheme.textPrimary)
 
-                    Text("Starts: \(Formatters.date.string(from: viewModel.transactionDate))")
-                        .font(.system(size: 13))
-                        .foregroundColor(AppTheme.textSecondary)
-                }
-
-                Spacer()
-
-                NavigationLink(destination: RecurringConfigSheet(viewModel: viewModel)) {
-                    Text("Edit")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(AppTheme.accent)
-                }
+                Text("Starts: \(Formatters.date.string(from: viewModel.transactionDate))")
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary)
             }
             .padding()
             .background(AppTheme.secondaryBackground)
@@ -148,9 +144,13 @@ struct RecurringPresetSheet: View {
     }
 
     // MARK: - Custom Config Button
-
+    // TODO: Re-enable when RecurringConfigSheet supports generic view models
+    /*
     private var customConfigButton: some View {
-        NavigationLink(destination: RecurringConfigSheet(viewModel: viewModel)) {
+        Button {
+            // Custom configuration would go here
+            dismiss()
+        } label: {
             HStack {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 16))
@@ -178,6 +178,7 @@ struct RecurringPresetSheet: View {
         }
         .buttonStyle(.plain)
     }
+    */
 
     // MARK: - Remove Recurring Button
 

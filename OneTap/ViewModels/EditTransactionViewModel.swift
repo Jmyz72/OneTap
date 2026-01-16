@@ -12,7 +12,7 @@ import Combine
 @preconcurrency internal import CoreData
 
 @MainActor
-class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
+class EditTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPickerViewModel, RecurringPickerViewModel {
     // MARK: - Published State
     @Published var amountString: String
     @Published var selectedType: TransactionType
@@ -129,7 +129,12 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     // MARK: - Computed Properties
 
     var isValid: Bool {
-        guard let amount = Double(amountString), amount > 0 else { return false }
+        // Convert cents to dollars
+        guard let cents = Double(amountString) else { return false }
+        let amount = cents / 100.0
+
+        // Allow zero amounts
+        guard amount >= 0 else { return false }
         guard selectedAccount != nil else { return false }
 
         if selectedType == .transfer {
@@ -141,7 +146,9 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
 
     var totalAmount: Double {
         if splitItems.isEmpty {
-            return Double(amountString) ?? 0
+            // Convert cents to dollars
+            let cents = Double(amountString) ?? 0
+            return cents / 100.0
         } else {
             // When split items exist, use their sum as the transaction amount
             return splitItems.reduce(0) { $0 + $1.amount }
@@ -238,12 +245,9 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     }
 
     private static func formatAmount(_ amount: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 2
-        formatter.numberStyle = .decimal
-        formatter.groupingSeparator = ""
-        return formatter.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)
+        // Convert dollars to cents for input
+        let cents = Int(amount * 100)
+        return String(cents)
     }
 
     // MARK: - Actions
@@ -261,9 +265,13 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     }
 
     func addSplitItem() {
-        guard let amount = Double(amountString), amount > 0, let category = selectedCategory else {
+        guard let cents = Double(amountString), let category = selectedCategory else {
             return
         }
+
+        // Convert cents to dollars
+        let amount = cents / 100.0
+        guard amount >= 0 else { return }
 
         let title = note.isEmpty ? (category.name ?? "") : note
         let item = SplitItemData(
@@ -284,15 +292,18 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         startLoading()
 
         do {
-            guard let newAmount = Double(amountString), let newAccount = selectedAccount else {
+            guard let cents = Double(amountString), let newAccount = selectedAccount else {
                 throw ValidationError.invalidAmount
             }
+
+            // Convert cents to dollars
+            let newAmount = cents / 100.0
 
             let oldDate = transaction.date ?? Date()
             let oldAccount = transaction.account
 
             // Add final split item if needed
-            if !splitItems.isEmpty, newAmount > 0, let category = selectedCategory {
+            if !splitItems.isEmpty, newAmount >= 0, let category = selectedCategory {
                 let lastItem = SplitItemData(
                     title: note.isEmpty ? (category.name ?? "") : note,
                     amount: newAmount,

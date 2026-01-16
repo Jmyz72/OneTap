@@ -1,24 +1,25 @@
 //
-//  AddInstallmentPlanView.swift
+//  EditInstallmentPlanView.swift
 //  OneTap
 //
-//  View for creating new installment plans
+//  View for editing existing installment plans
 //
 
 import SwiftUI
 @preconcurrency internal import CoreData
 
-struct AddInstallmentPlanView: View {
+struct EditInstallmentPlanView: View {
     @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) private var dismiss
 
-    @State private var viewModel: AddInstallmentPlanViewModel?
+    let plan: RecurringTransaction
+    @State private var viewModel: EditInstallmentPlanViewModel?
 
     var body: some View {
         Group {
             if let viewModel {
                 NavigationStack {
-                    AddInstallmentPlanContent(viewModel: viewModel, dismiss: dismiss)
+                    EditInstallmentPlanContent(viewModel: viewModel, dismiss: dismiss)
                 }
             } else {
                 ProgressView()
@@ -26,7 +27,7 @@ struct AddInstallmentPlanView: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = container.makeAddInstallmentPlanViewModel()
+                viewModel = container.makeEditInstallmentPlanViewModel(plan: plan)
             }
         }
     }
@@ -34,12 +35,9 @@ struct AddInstallmentPlanView: View {
 
 // MARK: - Content View
 
-private struct AddInstallmentPlanContent: View {
-    @ObservedObject var viewModel: AddInstallmentPlanViewModel
+private struct EditInstallmentPlanContent: View {
+    @ObservedObject var viewModel: EditInstallmentPlanViewModel
     let dismiss: DismissAction
-
-    @State private var showAccountPicker = false
-    @State private var showCategoryPicker = false
 
     var body: some View {
         ZStack {
@@ -49,21 +47,21 @@ private struct AddInstallmentPlanContent: View {
                 VStack(spacing: 24) {
                     // Header Section
                     VStack(spacing: 8) {
-                        Image(systemName: "creditcard.fill")
+                        Image(systemName: "pencil.circle.fill")
                             .font(.system(size: 50))
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [Color.orange, Color.red],
+                                    colors: [Color.blue, Color.purple],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
 
-                        Text("New Installment Plan")
+                        Text("Edit Installment Plan")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(AppTheme.textPrimary)
 
-                        Text("Split a purchase into monthly payments")
+                        Text("Update payment schedule and details")
                             .font(.system(size: 14))
                             .foregroundColor(AppTheme.textSecondary)
                             .multilineTextAlignment(.center)
@@ -84,10 +82,16 @@ private struct AddInstallmentPlanContent: View {
                                     .textFieldStyle(.roundedBorder)
                             }
 
+                            // Total amount is read-only for edit
                             FormField(label: "Total Amount", icon: "dollarsign.circle.fill") {
-                                TextField("0.00", text: $viewModel.totalAmountString)
-                                    .keyboardType(.decimalPad)
-                                    .textFieldStyle(.roundedBorder)
+                                Text(viewModel.totalAmountString)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(AppTheme.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 12)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(8)
                             }
                         }
 
@@ -149,12 +153,6 @@ private struct AddInstallmentPlanContent: View {
                                     .pickerStyle(.menu)
                                 }
 
-                                Toggle(isOn: $viewModel.firstPaymentImmediate) {
-                                    Label("Pay first installment now", systemImage: "bolt.fill")
-                                        .font(.system(size: 14, weight: .medium))
-                                }
-                                .toggleStyle(SwitchToggleStyle(tint: .orange))
-
                             case .weekly:
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
@@ -171,12 +169,6 @@ private struct AddInstallmentPlanContent: View {
                                 .padding(8)
                                 .background(Color.blue.opacity(0.1))
                                 .cornerRadius(8)
-
-                                Toggle(isOn: $viewModel.firstPaymentImmediate) {
-                                    Label("Pay first installment now", systemImage: "bolt.fill")
-                                        .font(.system(size: 14, weight: .medium))
-                                }
-                                .toggleStyle(SwitchToggleStyle(tint: .orange))
 
                             case .biweekly:
                                 VStack(alignment: .leading, spacing: 4) {
@@ -195,12 +187,6 @@ private struct AddInstallmentPlanContent: View {
                                 .background(Color.blue.opacity(0.1))
                                 .cornerRadius(8)
 
-                                Toggle(isOn: $viewModel.firstPaymentImmediate) {
-                                    Label("Pay first installment now", systemImage: "bolt.fill")
-                                        .font(.system(size: 14, weight: .medium))
-                                }
-                                .toggleStyle(SwitchToggleStyle(tint: .orange))
-
                             case .rolling:
                                 FormField(label: "Custom Cycle Duration (days)", icon: "clock") {
                                     TextField("Enter number of days", text: $viewModel.customRollingDaysString)
@@ -213,12 +199,6 @@ private struct AddInstallmentPlanContent: View {
                                     .foregroundColor(AppTheme.textTertiary)
                                     .italic()
 
-                                Toggle(isOn: $viewModel.firstPaymentImmediate) {
-                                    Label("Pay first installment now", systemImage: "bolt.fill")
-                                        .font(.system(size: 14, weight: .medium))
-                                }
-                                .toggleStyle(SwitchToggleStyle(tint: .orange))
-
                             case .consolidated:
                                 Toggle(isOn: $viewModel.useAccountBillingDates) {
                                     Label("Use account billing dates", systemImage: "creditcard")
@@ -227,7 +207,6 @@ private struct AddInstallmentPlanContent: View {
                                 .toggleStyle(SwitchToggleStyle(tint: .blue))
 
                                 if viewModel.useAccountBillingDates {
-                                    // Show account's billing and due dates
                                     if let account = viewModel.selectedAccount {
                                         HStack {
                                             Text("Billing Day:")
@@ -268,7 +247,6 @@ private struct AddInstallmentPlanContent: View {
                                     }
                                 }
 
-                                // Info banner
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
                                         Image(systemName: "info.circle.fill")
@@ -277,69 +255,12 @@ private struct AddInstallmentPlanContent: View {
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(.blue)
 
-                                    Text("First payment will be scheduled for the next billing cycle")
+                                    Text("Changes will apply to remaining payments")
                                         .font(.system(size: 11))
                                         .foregroundColor(AppTheme.textSecondary)
                                 }
                                 .padding(8)
                                 .background(Color.blue.opacity(0.1))
-                                .cornerRadius(8)
-                            }
-
-                            Divider()
-
-                            // Custom Start Date
-                            if viewModel.paymentCycleType != .consolidated {
-                                Toggle(isOn: $viewModel.useCustomStartDate) {
-                                    Label("Custom start date", systemImage: "calendar.badge.clock")
-                                        .font(.system(size: 14, weight: .medium))
-                                }
-                                .toggleStyle(SwitchToggleStyle(tint: .purple))
-
-                                if viewModel.useCustomStartDate {
-                                    DatePicker(
-                                        "Start Date",
-                                        selection: $viewModel.customStartDate,
-                                        displayedComponents: [.date]
-                                    )
-                                    .datePickerStyle(.graphical)
-                                    .padding(8)
-                                    .background(Color.gray.opacity(0.05))
-                                    .cornerRadius(8)
-                                }
-
-                                Divider()
-                            }
-
-                            // Projected payment dates
-                            if !viewModel.projectedPaymentDates.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Payment Schedule Preview")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(AppTheme.textSecondary)
-                                        .textCase(.uppercase)
-
-                                    ForEach(Array(viewModel.projectedPaymentDates.prefix(5).enumerated()), id: \.offset) { index, date in
-                                        HStack {
-                                            Text("Payment \(index + 1):")
-                                                .font(.system(size: 13))
-                                                .foregroundColor(AppTheme.textSecondary)
-                                            Spacer()
-                                            Text(Formatters.shortDate.string(from: date))
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundColor(AppTheme.textPrimary)
-                                        }
-                                    }
-
-                                    if viewModel.numberOfPayments > 5 {
-                                        Text("... and \(viewModel.numberOfPayments - 5) more")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(AppTheme.textTertiary)
-                                            .italic()
-                                    }
-                                }
-                                .padding(12)
-                                .background(Color.gray.opacity(0.1))
                                 .cornerRadius(8)
                             }
                         }
@@ -365,7 +286,6 @@ private struct AddInstallmentPlanContent: View {
                                     }
                                 }
 
-                                // Interest breakdown
                                 if viewModel.totalAmount > 0 && viewModel.annualInterestRate > 0 {
                                     VStack(spacing: 8) {
                                         Divider()
@@ -375,7 +295,7 @@ private struct AddInstallmentPlanContent: View {
                                                 .font(.system(size: 13))
                                                 .foregroundColor(AppTheme.textSecondary)
                                             Spacer()
-                                            Text(viewModel.formattedMonthlyPayment)
+                                            Text(viewModel.totalAmountString)
                                                 .font(.system(size: 13, weight: .semibold))
                                                 .foregroundColor(AppTheme.textPrimary)
                                         }
@@ -411,61 +331,6 @@ private struct AddInstallmentPlanContent: View {
                             }
                         }
 
-                        // Account & Category
-                        FormSection(title: "Account & Category") {
-                            Button {
-                                showAccountPicker = true
-                            } label: {
-                                HStack {
-                                    Label("Account", systemImage: "banknote.fill")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(AppTheme.textSecondary)
-
-                                    Spacer()
-
-                                    if let account = viewModel.selectedAccount {
-                                        Text(account.name ?? "Unknown")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(AppTheme.textPrimary)
-                                    } else {
-                                        Text("Select")
-                                            .foregroundColor(.gray)
-                                    }
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.gray)
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                showCategoryPicker = true
-                            } label: {
-                                HStack {
-                                    Label("Category", systemImage: "square.grid.2x2.fill")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(AppTheme.textSecondary)
-
-                                    Spacer()
-
-                                    if let category = viewModel.selectedCategory {
-                                        Text(category.name ?? "Unknown")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundColor(AppTheme.textPrimary)
-                                    } else {
-                                        Text("Select")
-                                            .foregroundColor(.gray)
-                                    }
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.gray)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-
                         // Notes
                         FormSection(title: "Notes (Optional)") {
                             TextEditor(text: $viewModel.notes)
@@ -488,9 +353,9 @@ private struct AddInstallmentPlanContent: View {
             }
 
             ToolbarItem(placement: .confirmationAction) {
-                Button("Create") {
+                Button("Save") {
                     Task {
-                        await viewModel.createInstallmentPlan()
+                        await viewModel.updateInstallmentPlan()
                         if viewModel.loadingState == .loaded {
                             dismiss()
                         }
@@ -499,18 +364,6 @@ private struct AddInstallmentPlanContent: View {
                 .disabled(!viewModel.isValid)
                 .fontWeight(.bold)
             }
-        }
-        .sheet(isPresented: $showAccountPicker) {
-            AccountPickerSheet(
-                accounts: viewModel.accounts,
-                selectedAccount: $viewModel.selectedAccount
-            )
-        }
-        .sheet(isPresented: $showCategoryPicker) {
-            CategoryPickerSheet(
-                categories: viewModel.expenseCategories,
-                selectedCategory: $viewModel.selectedCategory
-            )
         }
         .alert("Error", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
@@ -525,7 +378,7 @@ private struct AddInstallmentPlanContent: View {
     }
 }
 
-// MARK: - Supporting Views
+// MARK: - Supporting Views (reused from AddInstallmentPlanView)
 
 private struct FormSection<Content: View>: View {
     let title: String
@@ -565,41 +418,28 @@ private struct FormField<Content: View>: View {
     }
 }
 
-private struct CategoryPickerSheet: View {
-    let categories: [Category]
-    @Binding var selectedCategory: Category?
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List(categories, id: \.id) { category in
-                Button {
-                    selectedCategory = category
-                    dismiss()
-                } label: {
-                    HStack {
-                        Image(systemName: category.icon ?? "tag.fill")
-                            .foregroundColor(Color(hex: category.color ?? "#000000"))
-
-                        Text(category.name ?? "Unknown")
-                            .foregroundColor(AppTheme.textPrimary)
-
-                        Spacer()
-
-                        if selectedCategory?.id == category.id {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.blue)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Select Category")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
-
 #Preview {
-    AddInstallmentPlanView()
+    let container = PersistenceController.preview.container
+    let context = container.viewContext
+
+    let account = Account(context: context)
+    account.name = "Credit Card"
+    account.currency = "MYR"
+
+    let plan = RecurringTransaction(context: context)
+    plan.id = UUID()
+    plan.title = "iPhone 15 Pro"
+    plan.merchant = "Apple Store"
+    plan.amount = 100
+    plan.totalAmount = 1200
+    plan.isInstallment = true
+    plan.isActive = true
+    plan.occurrenceLimit = 12
+    plan.occurrencesCount = 3
+    plan.account = account
+    plan.paymentCycleType = "monthlyFixed"
+    plan.monthlyDay = 15
+
+    return EditInstallmentPlanView(plan: plan)
         .environmentObject(DependencyContainer(persistenceController: .preview))
 }

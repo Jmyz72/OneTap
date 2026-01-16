@@ -32,7 +32,7 @@ struct CustomKeypad: View {
                     numberKey("9")
                 }
                 HStack(spacing: 12) {
-                    numberKey(".")
+                    numberKey("00")
                     numberKey("0")
                     deleteKey()
                 }
@@ -84,9 +84,12 @@ struct CustomKeypad: View {
     
     private func numberKey(_ num: String) -> some View {
         Button {
-            if num == "." && value.contains(".") { return }
-            if value == "0" && num != "." { value = num }
-            else { value.append(num) }
+            // Cents-based input: no decimals, just digits
+            if value == "0" {
+                value = num
+            } else {
+                value.append(num)
+            }
         } label: {
             Text(num)
                 .font(.system(size: 24, weight: .semibold))

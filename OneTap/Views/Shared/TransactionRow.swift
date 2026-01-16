@@ -87,14 +87,8 @@ struct TransactionRow: View {
                     .gradientForeground(amountGradient)
 
                 HStack(spacing: 4) {
-                    // Adjustment badge (just icon like recurring)
-                    if transaction.typeEnum == .adjustment, let reason = transaction.adjustmentReason, !reason.isEmpty {
-                        Image(systemName: "doc.text.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.blue)
-                    }
-                    // Installment badge (priority over recurring)
-                    else if transaction.isPartOfInstallment, let label = transaction.installmentLabel {
+                    // Feature badges (installment has priority over recurring)
+                    if transaction.isPartOfInstallment, let label = transaction.installmentLabel {
                         HStack(spacing: 3) {
                             Image(systemName: "creditcard.fill")
                                 .font(.system(size: 8, weight: .bold))
@@ -106,31 +100,36 @@ struct TransactionRow: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule()
-                                .fill(Color.orange)
+                                .fill(AppTheme.installment)
                         )
                     } else if transaction.recurringTransaction != nil {
                         Image(systemName: "repeat")
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(AppTheme.accent)
+                            .foregroundColor(AppTheme.recurring)
+                    }
+
+                    // Claim badges
+                    if transaction.hasPendingClaim {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppTheme.claimPending)
+                    } else if transaction.hasSettledClaim {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppTheme.claimSettled)
                     }
 
                     // Excluded from reports badge
                     if transaction.excludeFromReports {
                         Image(systemName: "eye.slash")
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(AppTheme.textTertiary)
+                            .foregroundColor(AppTheme.excluded)
                     }
 
-                    // Claim badge
-                    if transaction.hasPendingClaim {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.orange)
-                    } else if transaction.hasSettledClaim {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.green)
-                    }
+                    // Type icon (small, next to time)
+                    Image(systemName: transaction.typeEnum.icon)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(transaction.typeEnum.color)
 
                     Text(Formatters.time.string(from: transaction.date ?? Date()))
                         .font(.system(size: 11, weight: .semibold))
@@ -198,8 +197,8 @@ struct TransactionRow: View {
         switch transaction.typeEnum {
         case .expense: return AppTheme.expense
         case .income: return AppTheme.income
-        case .transfer: return AppTheme.textPrimary
-        case .adjustment: return AppTheme.textSecondary
+        case .transfer: return AppTheme.transfer
+        case .adjustment: return AppTheme.adjustment
         }
     }
 
@@ -210,7 +209,7 @@ struct TransactionRow: View {
         case .transfer: return AppTheme.blueGradient
         case .adjustment:
             return LinearGradient(
-                colors: [AppTheme.textSecondary, AppTheme.textTertiary],
+                colors: [AppTheme.adjustment, AppTheme.adjustment.opacity(0.8)],
                 startPoint: .leading,
                 endPoint: .trailing
             )

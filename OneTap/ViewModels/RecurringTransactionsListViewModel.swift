@@ -15,10 +15,12 @@ class RecurringTransactionsListViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let repository: RecurringTransactionRepository
+    private let showInstallments: Bool
     private var cancellables = Set<AnyCancellable>()
 
-    init(repository: RecurringTransactionRepository) {
+    init(repository: RecurringTransactionRepository, showInstallments: Bool = false) {
         self.repository = repository
+        self.showInstallments = showInstallments
         observeRecurringTransactions()
     }
 
@@ -32,7 +34,15 @@ class RecurringTransactionsListViewModel: ObservableObject {
                     }
                 },
                 receiveValue: { [weak self] transactions in
-                    self?.recurringTransactions = transactions
+                    guard let self = self else { return }
+                    // Filter based on showInstallments flag
+                    if self.showInstallments {
+                        // Show only installments
+                        self.recurringTransactions = transactions.filter { $0.isInstallment }
+                    } else {
+                        // Show only regular recurring (exclude installments)
+                        self.recurringTransactions = transactions.filter { !$0.isInstallment }
+                    }
                 }
             )
             .store(in: &cancellables)

@@ -12,7 +12,7 @@ import Combine
 @preconcurrency internal import CoreData
 
 @MainActor
-class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
+class AddTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPickerViewModel, RecurringPickerViewModel {
     // MARK: - Published State
     @Published var amountString = "0"
     @Published var selectedType: TransactionType = .expense
@@ -105,7 +105,12 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     // MARK: - Computed Properties
 
     var isValid: Bool {
-        guard let amount = Double(amountString), amount > 0 else { return false }
+        // Convert cents to dollars
+        guard let cents = Double(amountString) else { return false }
+        let amount = cents / 100.0
+
+        // Allow zero amounts
+        guard amount >= 0 else { return false }
 
         if splitItems.isEmpty {
             if selectedType == .transfer {
@@ -120,7 +125,9 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
 
     var totalAmount: Double {
         if splitItems.isEmpty {
-            return Double(amountString) ?? 0
+            // Convert cents to dollars
+            let cents = Double(amountString) ?? 0
+            return cents / 100.0
         } else {
             // When split items exist, use their sum as the transaction amount
             return splitItems.reduce(0) { $0 + $1.amount }
@@ -236,9 +243,13 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
     }
 
     func addSplitItem() {
-        guard let amount = Double(amountString), amount > 0, let category = selectedCategory else {
+        guard let cents = Double(amountString), let category = selectedCategory else {
             return
         }
+
+        // Convert cents to dollars
+        let amount = cents / 100.0
+        guard amount >= 0 else { return }
 
         let title = note.isEmpty ? (category.name ?? "") : note
         let item = SplitItemData(
@@ -261,23 +272,27 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
 
         do {
             // Add final item to split if needed
-            if !splitItems.isEmpty, let amount = Double(amountString), amount > 0, let category = selectedCategory {
-                let lastItem = SplitItemData(
-                    title: note.isEmpty ? (category.name ?? "") : note,
-                    amount: amount,
-                    category: category,
-                    subCategory: selectedSubCategory
-                )
-                splitItems.append(lastItem)
+            if !splitItems.isEmpty, let cents = Double(amountString), let category = selectedCategory {
+                let amount = cents / 100.0
+                if amount >= 0 {
+                    let lastItem = SplitItemData(
+                        title: note.isEmpty ? (category.name ?? "") : note,
+                        amount: amount,
+                        category: category,
+                        subCategory: selectedSubCategory
+                    )
+                    splitItems.append(lastItem)
+                }
             }
 
             // Validate split transaction totals
             if !splitItems.isEmpty {
                 let splitTotal = splitItems.reduce(0) { $0 + $1.amount }
-                let expectedAmount = Double(amountString) ?? 0
+                let cents = Double(amountString) ?? 0
+                let expectedAmount = cents / 100.0
 
-                // Ensure split items have positive amounts
-                guard splitItems.allSatisfy({ $0.amount > 0 }) else {
+                // Ensure split items have valid amounts
+                guard splitItems.allSatisfy({ $0.amount >= 0 }) else {
                     throw ValidationError.invalidAmount
                 }
                 // Ensure at least one split item exists
@@ -337,7 +352,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                     merchant: merchant.isEmpty ? nil : merchant,
                     notes: note.isEmpty ? nil : note,
                     firstPaymentImmediate: true,
-                    billingDay: installmentBillingDay,
+                    paymentCycleType: .monthlyFixed,
+                    monthlyFixedDay: installmentBillingDay,
                     annualInterestRate: 0 // No interest for simple installments
                 )
             } else {

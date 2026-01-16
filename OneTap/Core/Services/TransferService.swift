@@ -71,11 +71,11 @@ class TransferService: TransferServiceProtocol {
         )
         sourceTransaction.relatedTransactionID = linkID
 
-        // DESTINATION TRANSACTION (Income type, credits destination account)
+        // DESTINATION TRANSACTION (Transfer type, credits destination account)
         let destTransaction = try transactionRepository.createTransaction(
             title: "Transfer from \(sourceAccount.name ?? "Account")",
             amount: amount,
-            type: .income,
+            type: .transfer,
             date: date,
             account: destinationAccount,
             category: nil,

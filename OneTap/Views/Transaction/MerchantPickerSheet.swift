@@ -7,8 +7,17 @@
 
 import SwiftUI
 
-struct MerchantPickerSheet: View {
-    @ObservedObject var viewModel: AddTransactionViewModel
+// Protocol for view models that support merchant picking
+protocol MerchantPickerViewModel: ObservableObject {
+    var merchant: String { get set }
+    var recentMerchants: [String] { get }
+    var merchantSuggestions: [String] { get }
+    func updateMerchantSuggestions()
+    func fetchAllMerchants() -> [String]
+}
+
+struct MerchantPickerSheet<ViewModel: MerchantPickerViewModel>: View {
+    @ObservedObject var viewModel: ViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var allMerchants: [String] = []

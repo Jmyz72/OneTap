@@ -247,7 +247,10 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         let predicate: NSPredicate? = nil
         let sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
         let allTransactions = transactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
-        recentTransactions = Array(allTransactions.prefix(5))
+
+        // Filter out transfer destinations to show transfers as single merged transaction
+        let filteredTransactions = allTransactions.filter { !$0.isTransferDestination }
+        recentTransactions = Array(filteredTransactions.prefix(5))
     }
 
     private func calculateTodayActivity() {

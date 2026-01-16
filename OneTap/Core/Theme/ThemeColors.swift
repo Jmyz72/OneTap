@@ -40,6 +40,17 @@ struct AppTheme {
     static let expense = Color(red: 1.0, green: 0.27, blue: 0.32) // Bright Red
     static let warning = Color(red: 1.0, green: 0.75, blue: 0.0) // Bright Yellow
 
+    // Transaction Type Colors
+    static let adjustment = Color(red: 1.0, green: 0.84, blue: 0.04) // Yellow
+    static let transfer = Color(red: 0.29, green: 0.56, blue: 0.89) // Blue
+
+    // Feature Badge Colors
+    static let recurring = Color(red: 0.75, green: 0.35, blue: 0.95) // Purple
+    static let installment = Color(red: 1.0, green: 0.58, blue: 0.0) // Orange
+    static let claimPending = Color(red: 1.0, green: 0.8, blue: 0.0) // Amber
+    static let claimSettled = Color(red: 0.35, green: 0.78, blue: 0.98) // Teal
+    static let excluded = Color(red: 0.56, green: 0.56, blue: 0.58) // Gray
+
     // Modern Gradient Backgrounds
     static let cardGradient = LinearGradient(
         colors: [

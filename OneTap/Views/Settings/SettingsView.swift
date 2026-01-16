@@ -60,6 +60,11 @@ private struct SettingsContent: View {
                             }
                             Divider().padding(.leading, 60)
 
+                            NavigationLink(destination: InstallmentPlansListView()) {
+                                SettingsRowContent(icon: "creditcard.fill", title: "Installments", color: .orange)
+                            }
+                            Divider().padding(.leading, 60)
+
                             SettingsRow(icon: "bell.fill", title: "Notifications", color: .pink)
                         }
                         .background(AppTheme.cardBackground)

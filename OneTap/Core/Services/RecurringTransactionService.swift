@@ -158,6 +158,11 @@ class RecurringTransactionService {
     }
 
     private func calculateNextDate(for recurring: RecurringTransaction, from date: Date) -> Date? {
+        // For installments, use dedicated cycle-aware logic
+        if recurring.isInstallment {
+            return calculateNextInstallmentDate(for: recurring, from: date)
+        }
+
         let calendar = Calendar.current
         let interval = Int(recurring.interval)
         let frequency = recurring.frequency ?? "Monthly"
@@ -271,9 +276,98 @@ class RecurringTransactionService {
         }
     }
 
+    // MARK: - Installment Payment Cycle Helpers
+
+    /// Calculates the initial payment date for a new installment plan based on cycle type
+    private func calculateInitialPaymentDate(
+        cycleType: PaymentCycleType,
+        startDate: Date,
+        plan: RecurringTransaction
+    ) -> Date {
+        let calendar = Calendar.current
+
+        switch cycleType {
+        case .monthlyFixed:
+            return calculateNextBillingDate(from: startDate, billingDay: plan.monthlyDay)
+
+        case .weekly:
+            return calendar.date(byAdding: .day, value: 7, to: startDate) ?? startDate
+
+        case .biweekly:
+            return calendar.date(byAdding: .day, value: 14, to: startDate) ?? startDate
+
+        case .rolling:
+            return calendar.date(byAdding: .day, value: Int(plan.rollingCycleDays), to: startDate) ?? startDate
+
+        case .consolidated:
+            // Calculate next billing date
+            let nextBilling = calculateNextBillingDate(from: startDate, billingDay: plan.effectiveBillingDay)
+
+            // Calculate due date from billing date
+            var billingComponents = calendar.dateComponents([.year, .month], from: nextBilling)
+            billingComponents.day = Int(plan.effectiveBillingDay)
+            billingComponents.hour = 0
+            billingComponents.minute = 0
+
+            var dueComponents = billingComponents
+            dueComponents.day = Int(plan.effectiveDueDay)
+
+            // If due day is earlier than billing day, it's next month
+            if plan.effectiveDueDay < plan.effectiveBillingDay {
+                dueComponents.month = (dueComponents.month ?? 1) + 1
+            }
+
+            return calendar.date(from: dueComponents) ?? nextBilling
+        }
+    }
+
+    /// Calculates the next installment date based on cycle type
+    private func calculateNextInstallmentDate(for plan: RecurringTransaction, from date: Date) -> Date? {
+        let calendar = Calendar.current
+
+        switch plan.paymentCycleTypeEnum {
+        case .monthlyFixed:
+            // Reuse existing monthly billing logic
+            return calculateNextBillingDate(from: date, billingDay: plan.monthlyDay)
+
+        case .weekly:
+            // Add 7 days
+            return calendar.date(byAdding: .day, value: 7, to: date)
+
+        case .biweekly:
+            // Add 14 days
+            return calendar.date(byAdding: .day, value: 14, to: date)
+
+        case .rolling:
+            // Add N days to current date
+            let days = Int(plan.rollingCycleDays)
+            return calendar.date(byAdding: .day, value: days, to: date)
+
+        case .consolidated:
+            // Calculate next billing date
+            let nextBilling = calculateNextBillingDate(from: date, billingDay: plan.effectiveBillingDay)
+
+            // Calculate due date
+            var billingComponents = calendar.dateComponents([.year, .month], from: nextBilling)
+            billingComponents.day = Int(plan.effectiveBillingDay)
+            billingComponents.hour = 0
+            billingComponents.minute = 0
+
+            var dueComponents = billingComponents
+            dueComponents.day = Int(plan.effectiveDueDay)
+
+            // If due day < billing day, advance to next month
+            if plan.effectiveDueDay < plan.effectiveBillingDay {
+                dueComponents.month = (dueComponents.month ?? 1) + 1
+            }
+
+            return calendar.date(from: dueComponents)
+        }
+    }
+
     // MARK: - Installment Creation
 
-    /// Creates an installment plan with optional immediate first payment
+    /// Creates an installment plan with configurable payment cycle type
     /// - Parameters:
     ///   - title: Purchase description (e.g., "iPhone 15 Pro")
     ///   - totalAmount: Total purchase amount (e.g., $1200)
@@ -283,8 +377,12 @@ class RecurringTransactionService {
     ///   - subCategory: Optional subcategory
     ///   - merchant: Optional merchant name
     ///   - notes: Optional notes
-    ///   - firstPaymentImmediate: If true, creates first payment today
-    ///   - billingDay: Day of month for recurring payments (1-31, 0 = last day)
+    ///   - firstPaymentImmediate: If true, creates first payment today (not applicable for consolidated billing)
+    ///   - paymentCycleType: Type of payment cycle (monthlyFixed, rolling, or consolidated)
+    ///   - monthlyFixedDay: Day of month for monthly fixed cycle (1-31, 0 = last day). Used only for monthlyFixed type.
+    ///   - rollingCycleDays: Number of days between payments for rolling cycle (30, 45, or 60). Used only for rolling type.
+    ///   - overrideBillingDay: Custom billing day for consolidated cycle (overrides account default). Used only for consolidated type.
+    ///   - overrideDueDay: Custom due day for consolidated cycle (overrides account default). Used only for consolidated type.
     ///   - startDate: Date when installment plan begins (used if firstPaymentImmediate = false)
     ///   - annualInterestRate: Optional APR as decimal (e.g., 0.15 for 15% APR). Defaults to 0 (no interest)
     /// - Returns: Tuple of (RecurringTransaction plan, Optional first Transaction)
@@ -298,7 +396,11 @@ class RecurringTransactionService {
         merchant: String?,
         notes: String?,
         firstPaymentImmediate: Bool,
-        billingDay: Int16,
+        paymentCycleType: PaymentCycleType,
+        monthlyFixedDay: Int16? = nil,
+        rollingCycleDays: Int16? = nil,
+        overrideBillingDay: Int16? = nil,
+        overrideDueDay: Int16? = nil,
         startDate: Date = Date(),
         annualInterestRate: Double = 0.0
     ) async throws -> (RecurringTransaction, Transaction?) {
@@ -338,10 +440,8 @@ class RecurringTransactionService {
         plan.isInstallment = true
         plan.hasInterest = hasInterest
         plan.interestRate = annualInterestRate
-        plan.firstPaymentImmediate = firstPaymentImmediate
         plan.occurrenceLimit = numberOfPayments
         plan.occurrencesCount = 0
-        plan.monthlyDay = billingDay
         plan.account = account
         plan.category = category
         plan.subCategory = subCategory
@@ -350,9 +450,36 @@ class RecurringTransactionService {
         plan.createdAt = now
         plan.updatedAt = now
 
+        // Set payment cycle type configuration
+        plan.paymentCycleType = paymentCycleType.rawValue
+
+        switch paymentCycleType {
+        case .monthlyFixed:
+            plan.monthlyDay = monthlyFixedDay ?? 1
+            plan.firstPaymentImmediate = firstPaymentImmediate
+
+        case .weekly:
+            plan.rollingCycleDays = 7
+            plan.firstPaymentImmediate = firstPaymentImmediate
+
+        case .biweekly:
+            plan.rollingCycleDays = 14
+            plan.firstPaymentImmediate = firstPaymentImmediate
+
+        case .rolling:
+            plan.rollingCycleDays = rollingCycleDays ?? 30
+            plan.firstPaymentImmediate = firstPaymentImmediate
+
+        case .consolidated:
+            plan.overrideBillingDay = overrideBillingDay ?? 0
+            plan.overrideDueDay = overrideDueDay ?? 0
+            // Consolidated billing never pays immediately
+            plan.firstPaymentImmediate = false
+        }
+
         var firstTransaction: Transaction? = nil
 
-        if firstPaymentImmediate {
+        if plan.firstPaymentImmediate {
             // Type 1: Pay first installment NOW
             plan.startDate = now
             plan.occurrencesCount = 1
@@ -374,16 +501,21 @@ class RecurringTransactionService {
             firstTransaction?.installmentPlanID = plan.id
             firstTransaction?.installmentNumber = 1
 
-            // Calculate next billing date
-            let nextBillingDate = calculateNextBillingDate(from: now, billingDay: billingDay)
-            plan.nextRunDate = nextBillingDate
+            // Calculate next payment date using cycle-aware logic
+            if let nextPaymentDate = calculateNextInstallmentDate(for: plan, from: now) {
+                plan.nextRunDate = nextPaymentDate
+            }
             plan.lastRunDate = now
 
         } else {
-            // Type 2: First payment on next billing date
-            let nextBillingDate = calculateNextBillingDate(from: startDate, billingDay: billingDay)
-            plan.startDate = nextBillingDate
-            plan.nextRunDate = nextBillingDate
+            // Type 2: First payment on next calculated date based on cycle type
+            let nextPaymentDate = calculateInitialPaymentDate(
+                cycleType: paymentCycleType,
+                startDate: startDate,
+                plan: plan
+            )
+            plan.startDate = nextPaymentDate
+            plan.nextRunDate = nextPaymentDate
         }
 
         try context.save()
@@ -394,6 +526,73 @@ class RecurringTransactionService {
         }
 
         return (plan, firstTransaction)
+    }
+
+    /// Updates an existing installment plan
+    func updateInstallmentPlan(
+        _ plan: RecurringTransaction,
+        title: String?,
+        merchant: String?,
+        notes: String?,
+        paymentCycleType: PaymentCycleType,
+        monthlyFixedDay: Int16?,
+        rollingCycleDays: Int16?,
+        overrideBillingDay: Int16?,
+        overrideDueDay: Int16?,
+        numberOfPayments: Int16,
+        annualInterestRate: Double
+    ) async throws {
+        // Update basic fields
+        plan.title = title
+        plan.merchant = merchant
+        plan.notes = notes
+        plan.updatedAt = Date()
+
+        // Update payment cycle configuration
+        plan.paymentCycleType = paymentCycleType.rawValue
+
+        switch paymentCycleType {
+        case .monthlyFixed:
+            plan.monthlyDay = monthlyFixedDay ?? 1
+
+        case .weekly:
+            plan.rollingCycleDays = 7
+
+        case .biweekly:
+            plan.rollingCycleDays = 14
+
+        case .rolling:
+            plan.rollingCycleDays = rollingCycleDays ?? 30
+
+        case .consolidated:
+            plan.overrideBillingDay = overrideBillingDay ?? 0
+            plan.overrideDueDay = overrideDueDay ?? 0
+        }
+
+        // Update occurrence limit (total number of payments)
+        plan.occurrenceLimit = numberOfPayments
+
+        // Update interest rate
+        plan.interestRate = annualInterestRate
+        plan.hasInterest = annualInterestRate > 0
+
+        // Recalculate payment amount if interest rate changed
+        if plan.hasInterest && annualInterestRate > 0 {
+            plan.amount = RecurringTransaction.calculateMonthlyPayment(
+                principal: plan.totalAmount,
+                apr: annualInterestRate,
+                months: numberOfPayments
+            )
+        } else {
+            plan.amount = plan.totalAmount / Double(numberOfPayments)
+        }
+
+        // Recalculate next payment date if cycle type changed
+        if let nextDate = calculateNextInstallmentDate(for: plan, from: plan.nextRunDate ?? Date()) {
+            plan.nextRunDate = nextDate
+        }
+
+        try context.save()
     }
 
     /// Calculates the next billing date based on billing day

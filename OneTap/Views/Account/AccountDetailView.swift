@@ -156,21 +156,9 @@ struct AccountDetailView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(AppTheme.textPrimary)
 
-                        HStack(spacing: 6) {
-                            Text(account.typeEnum.rawValue)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(AppTheme.textSecondary)
-
-                            if account.isLiability {
-                                Text("•")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(AppTheme.textTertiary)
-
-                                Text("Liability")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(AppTheme.expense)
-                            }
-                        }
+                        Text(account.typeEnum.rawValue)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(AppTheme.textSecondary)
                     }
                 }
 

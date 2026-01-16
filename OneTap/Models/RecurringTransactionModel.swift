@@ -193,4 +193,64 @@ extension RecurringTransaction {
             return formatted
         }
     }
+
+    // MARK: - Payment Cycle Type Helpers
+
+    /// Payment cycle type enum
+    var paymentCycleTypeEnum: PaymentCycleType {
+        get {
+            guard let type = paymentCycleType,
+                  let value = PaymentCycleType(rawValue: type) else {
+                return .monthlyFixed
+            }
+            return value
+        }
+        set {
+            paymentCycleType = newValue.rawValue
+        }
+    }
+
+    /// Effective billing day (for consolidated cycle, uses override or account default)
+    var effectiveBillingDay: Int16 {
+        // For consolidated: use override or account default
+        if paymentCycleTypeEnum == .consolidated {
+            if overrideBillingDay > 0 {
+                return overrideBillingDay
+            }
+            return account?.billingDate ?? 1
+        }
+        // For monthly fixed: use monthlyDay
+        return monthlyDay
+    }
+
+    /// Effective due day (for consolidated cycle, uses override or account default)
+    var effectiveDueDay: Int16 {
+        // For consolidated: use override or account default
+        if paymentCycleTypeEnum == .consolidated {
+            if overrideDueDay > 0 {
+                return overrideDueDay
+            }
+            return account?.dueDate ?? 10
+        }
+        return 0  // Not applicable for other types
+    }
+
+    /// Formatted cycle information for display
+    var formattedCycleInfo: String {
+        switch paymentCycleTypeEnum {
+        case .monthlyFixed:
+            let day = monthlyDay == 0 ? "Last day" : "\(monthlyDay)"
+            return "Due \(day) of each month"
+        case .weekly:
+            return "Due every 7 days"
+        case .biweekly:
+            return "Due every 14 days"
+        case .rolling:
+            return "Due every \(rollingCycleDays) days"
+        case .consolidated:
+            let billingDay = effectiveBillingDay == 0 ? "Last day" : "\(effectiveBillingDay)"
+            let dueDay = effectiveDueDay == 0 ? "Last day" : "\(effectiveDueDay)"
+            return "Billed on \(billingDay), due on \(dueDay)"
+        }
+    }
 }

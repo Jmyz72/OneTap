@@ -94,8 +94,12 @@ class TransactionListViewModel: ObservableObject, ViewModelProtocol {
                     self?.handleError(error)
                 }
             } receiveValue: { [weak self] groupedTransactions in
-                self?.sectionedTransactions = groupedTransactions
-                self?.sections = groupedTransactions.keys.sorted(by: >)
+                // Filter out transfer destinations to show transfers as single merged transaction
+                let filteredTransactions = groupedTransactions.mapValues { transactions in
+                    transactions.filter { !$0.isTransferDestination }
+                }
+                self?.sectionedTransactions = filteredTransactions
+                self?.sections = filteredTransactions.keys.sorted(by: >)
                 self?.loadingState = .loaded
             }
     }

@@ -18,6 +18,7 @@ struct InstallmentDetailView: View {
     @State private var showEarlyPayoffAlert = false
     @State private var showCancelAlert = false
     @State private var showCancelOptions = false
+    @State private var showEditSheet = false
 
     var body: some View {
         Group {
@@ -109,6 +110,17 @@ struct InstallmentDetailView: View {
                 }
                 .navigationTitle(plan.title ?? "Installment Plan")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    if plan.isActive {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                showEditSheet = true
+                            } label: {
+                                Image(systemName: "pencil")
+                            }
+                        }
+                    }
+                }
                 .alert("Pay Off Early", isPresented: $showEarlyPayoffAlert) {
                     Button("Cancel", role: .cancel) {}
                     Button("Pay Off") {
@@ -149,6 +161,9 @@ struct InstallmentDetailView: View {
                     if shouldDismiss {
                         dismiss()
                     }
+                }
+                .sheet(isPresented: $showEditSheet) {
+                    EditInstallmentPlanView(plan: plan)
                 }
             } else {
                 ProgressView()
