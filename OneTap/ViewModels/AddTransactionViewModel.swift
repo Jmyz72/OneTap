@@ -275,10 +275,13 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                     throw ValidationError.invalidAmount
                 }
 
-                // CRITICAL: Ensure split items sum equals the expected transaction amount
+                // CRITICAL: If user entered an amount, ensure split items sum matches it
                 // Allow 0.01 tolerance for floating point precision
-                guard abs(splitTotal - expectedAmount) < 0.01 else {
-                    throw ValidationError.splitItemsMismatch(expected: expectedAmount, actual: splitTotal)
+                // If expectedAmount is 0, split items define the total (no validation needed)
+                if expectedAmount > 0 {
+                    guard abs(splitTotal - expectedAmount) < 0.01 else {
+                        throw ValidationError.splitItemsMismatch(expected: expectedAmount, actual: splitTotal)
+                    }
                 }
             }
 
@@ -325,12 +328,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                 )
             } else {
                 // Regular transaction or split transaction
-                let transactionTitle: String
-                if !splitItems.isEmpty {
-                    transactionTitle = "Split Transaction (\(splitItems.count) Items)"
-                } else {
-                    transactionTitle = title
-                }
+                // Use the user's entered title regardless of split items
+                let transactionTitle: String = title
 
                 if isRecurring {
                     // Prepare weekly days string
