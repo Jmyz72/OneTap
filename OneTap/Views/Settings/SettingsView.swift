@@ -67,6 +67,23 @@ private struct SettingsContent: View {
                         .padding(.horizontal, 20)
                     }
 
+                    // Features Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Features")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppTheme.textPrimary)
+                            .padding(.horizontal, 20)
+
+                        VStack(spacing: 0) {
+                            NavigationLink(destination: OCRSettingsView()) {
+                                SettingsRowContent(icon: "camera.viewfinder", title: "Screenshot Import", color: .cyan)
+                            }
+                        }
+                        .background(AppTheme.cardBackground)
+                        .cornerRadius(12)
+                        .padding(.horizontal, 20)
+                    }
+
                     // Data Section
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Data")

@@ -10,5 +10,20 @@
 	<array>
 		<string>processing</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>onetap</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.jimmyhew.OneTap</string>
+		</dict>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>OneTap needs camera access to capture receipts for transaction import.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>OneTap needs photo library access to import receipt images for transaction import.</string>
 </dict>
 </plist>

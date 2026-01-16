@@ -1,0 +1,228 @@
+//
+//  OCRImportViewModel.swift
+//  OneTap
+//
+//  ViewModel for OCR transaction import confirmation screen
+//
+
+import SwiftUI
+import Combine
+@preconcurrency internal import CoreData
+
+@MainActor
+class OCRImportViewModel: ObservableObject, ViewModelProtocol {
+
+    // MARK: - Published State
+
+    @Published var extractedData: TransactionExtractionService.ExtractedTransaction?
+    @Published var selectedAccount: Account?
+    @Published var selectedCategory: Category?
+    @Published var selectedSubCategory: SubCategory?
+    @Published var amount: String = ""
+    @Published var merchant: String = ""
+    @Published var transactionDate: Date = Date()
+    @Published var note: String = ""
+
+    @Published var accounts: [Account] = []
+    @Published var categories: [Category] = []
+
+    @Published var splitItems: [SplitItemData] = []
+    @Published var hasSplitItems: Bool = false
+
+    @Published var loadingState: LoadingState = .idle
+    @Published var errorMessage: String?
+    @Published var shouldDismiss: Bool = false
+
+    // MARK: - Dependencies
+
+    private let ocrService: OCRService
+    private let extractionService: TransactionExtractionService
+    private let categoryMatchingService: CategoryMatchingService
+    private let transactionRepository: TransactionRepository
+    private let accountRepository: AccountRepository
+    private let categoryRepository: CategoryRepository
+    private let balanceService: BalanceService
+    private let validationService: ValidationService
+
+    // MARK: - Initialization
+
+    init(
+        ocrService: OCRService,
+        extractionService: TransactionExtractionService,
+        categoryMatchingService: CategoryMatchingService,
+        transactionRepository: TransactionRepository,
+        accountRepository: AccountRepository,
+        categoryRepository: CategoryRepository,
+        balanceService: BalanceService,
+        validationService: ValidationService
+    ) {
+        self.ocrService = ocrService
+        self.extractionService = extractionService
+        self.categoryMatchingService = categoryMatchingService
+        self.transactionRepository = transactionRepository
+        self.accountRepository = accountRepository
+        self.categoryRepository = categoryRepository
+        self.balanceService = balanceService
+        self.validationService = validationService
+
+        loadData()
+    }
+
+    // MARK: - Data Loading
+
+    private func loadData() {
+        accounts = accountRepository.fetchAccounts(group: nil, includeArchived: false)
+        categories = categoryRepository.fetchCategories(type: .expense)
+
+        // Pre-select first account
+        selectedAccount = accounts.first
+    }
+
+    // MARK: - OCR Processing
+
+    func processScreenshot(_ image: UIImage) async {
+        startLoading()
+
+        do {
+            // 1. Perform OCR
+            let ocrResult = try await ocrService.extractText(from: image)
+
+            // 2. Extract transaction data
+            let extracted = extractionService.extractTransaction(from: ocrResult)
+            extractedData = extracted
+
+            // 3. Populate fields
+            if let amount = extracted.amount {
+                self.amount = String(format: "%.2f", amount)
+            }
+
+            if let merchant = extracted.merchant {
+                self.merchant = merchant
+
+                // 4. Suggest category based on merchant
+                selectedCategory = categoryMatchingService.suggestCategory(
+                    forMerchant: merchant,
+                    notes: extracted.notes
+                )
+            }
+
+            if let date = extracted.date {
+                self.transactionDate = date
+            }
+
+            if let notes = extracted.notes {
+                self.note = notes
+            }
+
+            // 5. Convert line items to SplitItemData
+            if !extracted.lineItems.isEmpty {
+                splitItems = extracted.lineItems.map { item in
+                    SplitItemData(
+                        title: item.title,
+                        amount: item.amount,
+                        category: selectedCategory, // Default to main category
+                        subCategory: nil
+                    )
+                }
+                hasSplitItems = true
+            } else {
+                splitItems = []
+                hasSplitItems = false
+            }
+
+            finishLoading()
+
+        } catch {
+            handleError(error)
+        }
+    }
+
+    // MARK: - Split Item Management
+
+    func addSplitItem() {
+        let newItem = SplitItemData(
+            title: "",
+            amount: 0.0,
+            category: selectedCategory,
+            subCategory: nil
+        )
+        splitItems.append(newItem)
+        hasSplitItems = true
+    }
+
+    func removeSplitItem(at index: Int) {
+        guard index < splitItems.count else { return }
+        splitItems.remove(at: index)
+        hasSplitItems = !splitItems.isEmpty
+    }
+
+    func updateSplitItem(at index: Int, with item: SplitItemData) {
+        guard index < splitItems.count else { return }
+        splitItems[index] = item
+    }
+
+    func clearSplitItems() {
+        splitItems.removeAll()
+        hasSplitItems = false
+    }
+
+    // MARK: - Save Transaction
+
+    func saveTransaction() async {
+        startLoading()
+
+        do {
+            // Validation
+            guard let amountValue = Double(amount), amountValue > 0 else {
+                throw ValidationError.invalidAmount
+            }
+
+            guard let account = selectedAccount else {
+                throw ValidationError.missingAccount
+            }
+
+            guard let category = selectedCategory else {
+                throw ValidationError.missingCategory
+            }
+
+            try validationService.validateTransaction(
+                amount: amountValue,
+                type: .expense,
+                account: account,
+                category: category,
+                toAccount: nil
+            )
+
+            // Create transaction
+            let transaction = try transactionRepository.createTransaction(
+                title: merchant.isEmpty ? "OCR Import" : merchant,
+                amount: amountValue,
+                type: .expense,
+                date: transactionDate,
+                account: account,
+                category: category,
+                subCategory: selectedSubCategory,
+                merchant: merchant.isEmpty ? nil : merchant,
+                notes: note.isEmpty ? nil : note,
+                adjustmentReason: nil,
+                excludeFromReports: false
+            )
+
+            // Add split items if available
+            if hasSplitItems && !splitItems.isEmpty {
+                try transactionRepository.addSplitItems(splitItems, to: transaction)
+            }
+
+            try transactionRepository.save()
+
+            // Recalculate balances
+            try await balanceService.recalculateBalances(for: account.objectID, from: transactionDate)
+
+            shouldDismiss = true
+            finishLoading()
+
+        } catch {
+            handleError(error)
+        }
+    }
+}

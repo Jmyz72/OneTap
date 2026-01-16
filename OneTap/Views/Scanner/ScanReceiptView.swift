@@ -2,13 +2,19 @@
 //  ScanReceiptView.swift
 //  OneTap
 //
-//  AI-powered receipt scanning view
+//  Receipt scanning view with camera and photo library
 //
 
 import SwiftUI
 
 struct ScanReceiptView: View {
+    @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) private var dismiss
+
+    @State private var showingCamera = false
+    @State private var showingPhotoLibrary = false
+    @State private var capturedImage: UIImage?
+    @State private var showingOCRImport = false
 
     var body: some View {
         NavigationStack {
@@ -39,11 +45,11 @@ struct ScanReceiptView: View {
                     }
 
                     VStack(spacing: 12) {
-                        Text("AI Receipt Scanner")
+                        Text("Receipt Scanner")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(AppTheme.textPrimary)
 
-                        Text("Scan receipts and automatically extract transaction details with AI")
+                        Text("Scan receipts and automatically extract transaction details")
                             .font(.system(size: 16))
                             .foregroundColor(AppTheme.textSecondary)
                             .multilineTextAlignment(.center)
@@ -59,8 +65,8 @@ struct ScanReceiptView: View {
 
                         FeatureItem(
                             icon: "sparkles",
-                            title: "AI-Powered",
-                            description: "Advanced AI categorizes your expenses"
+                            title: "Smart Categorization",
+                            description: "Automatically categorizes your expenses"
                         )
 
                         FeatureItem(
@@ -73,21 +79,54 @@ struct ScanReceiptView: View {
 
                     Spacer()
 
-                    // Coming Soon Badge
-                    Text("Coming Soon")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 16)
-                        .background(
-                            LinearGradient(
-                                colors: [AppTheme.accent, AppTheme.accent.opacity(0.8)],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                    // Scan Options
+                    VStack(spacing: 16) {
+                        // Take Photo Button
+                        Button {
+                            showingCamera = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 18))
+                                Text("Take Photo")
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [AppTheme.accent, AppTheme.accent.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
-                        )
-                        .cornerRadius(12)
-                        .shadow(color: AppTheme.accent.opacity(0.3), radius: 12, x: 0, y: 6)
+                            .cornerRadius(12)
+                            .shadow(color: AppTheme.accent.opacity(0.3), radius: 12, x: 0, y: 6)
+                        }
+
+                        // Choose from Library Button
+                        Button {
+                            showingPhotoLibrary = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "photo.fill")
+                                    .font(.system(size: 18))
+                                Text("Choose from Library")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            .foregroundColor(AppTheme.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(AppTheme.cardBackground)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(AppTheme.accent, lineWidth: 2)
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 32)
 
                     Spacer()
                 }
@@ -99,6 +138,23 @@ struct ScanReceiptView: View {
                     Button("Close") {
                         dismiss()
                     }
+                }
+            }
+            .sheet(isPresented: $showingCamera) {
+                ImagePicker(image: $capturedImage, sourceType: .camera)
+            }
+            .sheet(isPresented: $showingPhotoLibrary) {
+                ImagePicker(image: $capturedImage, sourceType: .photoLibrary)
+            }
+            .sheet(isPresented: $showingOCRImport) {
+                if let image = capturedImage {
+                    OCRImportView(screenshot: image)
+                        .environmentObject(container)
+                }
+            }
+            .onChange(of: capturedImage) { _, newImage in
+                if newImage != nil {
+                    showingOCRImport = true
                 }
             }
         }

@@ -35,6 +35,9 @@ final class DependencyContainer: ObservableObject {
     let recurringTransactionService: RecurringTransactionService
     let budgetService: BudgetService
     let claimService: ClaimService
+    let ocrService: OCRService
+    let transactionExtractionService: TransactionExtractionService
+    let categoryMatchingService: CategoryMatchingService
 
     init(persistenceController: PersistenceController? = nil) {
         let pc = persistenceController ?? PersistenceController.shared
@@ -73,6 +76,9 @@ final class DependencyContainer: ObservableObject {
             transactionRepository: transactionRepository,
             balanceService: balanceService
         )
+        self.ocrService = OCRService()
+        self.transactionExtractionService = TransactionExtractionService()
+        self.categoryMatchingService = CategoryMatchingService(categoryRepository: categoryRepository)
     }
 
     // MARK: - ViewModel Factories
@@ -207,6 +213,19 @@ final class DependencyContainer: ObservableObject {
             claimRepository: claimRepository,
             claimService: claimService,
             accountRepository: accountRepository
+        )
+    }
+
+    func makeOCRImportViewModel() -> OCRImportViewModel {
+        OCRImportViewModel(
+            ocrService: ocrService,
+            extractionService: transactionExtractionService,
+            categoryMatchingService: categoryMatchingService,
+            transactionRepository: transactionRepository,
+            accountRepository: accountRepository,
+            categoryRepository: categoryRepository,
+            balanceService: balanceService,
+            validationService: validationService
         )
     }
 }
