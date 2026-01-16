@@ -14,6 +14,7 @@ protocol ClaimRepositoryProtocol {
     func createClaim(from transaction: Transaction) throws -> Claim
     func fetch(predicate: NSPredicate?, sortDescriptors: [NSSortDescriptor]) -> [Claim]
     func fetchPendingClaims(for account: Account?) -> [Claim]
+    func fetchClaim(for transactionID: UUID) -> Claim?
     func update(_ claim: Claim, status: ClaimStatus, settledDate: Date?, reimbursementID: UUID?, adjustmentID: UUID?) throws
     func delete(_ claim: Claim) throws
     func save() throws
@@ -88,6 +89,11 @@ class ClaimRepository: BaseRepository, ClaimRepositoryProtocol {
         let sortDescriptors = [NSSortDescriptor(keyPath: \Claim.submittedDate, ascending: false)]
 
         return fetch(predicate: predicate, sortDescriptors: sortDescriptors)
+    }
+
+    func fetchClaim(for transactionID: UUID) -> Claim? {
+        let predicate = NSPredicate(format: "originalTransactionID == %@", transactionID as CVarArg)
+        return fetch(predicate: predicate, sortDescriptors: []).first
     }
 
     // MARK: - Update

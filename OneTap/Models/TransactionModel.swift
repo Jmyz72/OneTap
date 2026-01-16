@@ -130,6 +130,31 @@ extension Transaction {
 
         return "\(validPlan.formattedProgress) • \(remainingStr) remaining"
     }
+
+    // MARK: - Claim Helpers
+
+    /// Returns the claim associated with this transaction, if any
+    var claim: Claim? {
+        guard let transactionID = id, let context = managedObjectContext else { return nil }
+
+        let request: NSFetchRequest<Claim> = Claim.fetchRequest()
+        request.predicate = NSPredicate(format: "originalTransactionID == %@", transactionID as CVarArg)
+        request.fetchLimit = 1
+
+        return try? context.fetch(request).first
+    }
+
+    /// Returns true if this transaction has a pending claim
+    var hasPendingClaim: Bool {
+        guard let claim = claim else { return false }
+        return claim.statusEnum == .pending
+    }
+
+    /// Returns true if this transaction has a settled claim
+    var hasSettledClaim: Bool {
+        guard let claim = claim else { return false }
+        return claim.statusEnum == .settled
+    }
 }
 
 extension TransactionItem {

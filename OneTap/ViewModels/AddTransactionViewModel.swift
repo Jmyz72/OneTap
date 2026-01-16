@@ -183,6 +183,20 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol {
                 }
             )
             .store(in: &cancellables)
+
+        // Auto-toggle exclude when claim is toggled
+        $markAsClaim
+            .sink { [weak self] isClaim in
+                guard let self = self else { return }
+                if isClaim {
+                    // When marking as claim, automatically exclude from reports
+                    self.excludeFromReports = true
+                } else {
+                    // When unmarking claim, automatically uncheck exclude
+                    self.excludeFromReports = false
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Actions

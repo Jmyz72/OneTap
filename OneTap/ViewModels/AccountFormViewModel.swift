@@ -191,6 +191,9 @@ class AccountFormViewModel: ObservableObject, ViewModelProtocol {
                     )
 
                     try transactionRepository.save()
+
+                    // Recalculate balances to set the opening balance transaction's balanceAfter field
+                    try await balanceService.recalculateBalances(for: newAccount.objectID, from: nil)
                 }
             }
 

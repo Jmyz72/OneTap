@@ -69,7 +69,10 @@ class TransactionDetailViewModel: ObservableObject, ViewModelProtocol {
             try transactionRepository.deleteTransaction(transaction, cascade: true)
             try transactionRepository.save()
 
-            // Recalculate balances
+            // Dismiss immediately after delete to avoid rendering deleted object
+            shouldDismiss = true
+
+            // Recalculate balances (view will dismiss while this runs)
             var accountsToRecalculate: [NSManagedObjectID] = []
             if let account = currentAccount {
                 accountsToRecalculate.append(account.objectID)
@@ -80,8 +83,8 @@ class TransactionDetailViewModel: ObservableObject, ViewModelProtocol {
 
             try await balanceService.recalculateBalances(for: accountsToRecalculate, from: transactionDate)
 
+            // Finish loading after everything completes
             finishLoading()
-            shouldDismiss = true
 
         } catch {
             handleError(error)

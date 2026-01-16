@@ -110,8 +110,10 @@ final class DependencyContainer: ObservableObject {
             transactionRepository: transactionRepository,
             accountRepository: accountRepository,
             categoryRepository: categoryRepository,
+            claimRepository: claimRepository,
             transferService: transferService,
-            balanceService: balanceService
+            balanceService: balanceService,
+            claimService: claimService
         )
     }
 

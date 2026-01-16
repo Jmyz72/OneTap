@@ -60,7 +60,7 @@ struct TransactionMiddleBar: View {
                     Button(action: onMerchantTap) {
                         chipView(
                             icon: "mappin.and.ellipse",
-                            text: merchant.isEmpty ? "Add Merchant" : merchant,
+                            text: merchant.isEmpty ? "Merchant" : "Merchant: \(merchant)",
                             isActive: !merchant.isEmpty
                         )
                     }
@@ -85,6 +85,7 @@ struct TransactionMiddleBar: View {
                         isActive: excludeFromReports
                     )
                 }
+                .disabled(markAsClaim)
 
                 // Claim Chip (Expense only)
                 if selectedType == .expense {
@@ -132,7 +133,7 @@ struct TransactionMiddleBar: View {
                 Button(action: onRecurringTap) {
                     chipView(
                         icon: "repeat",
-                        text: isRecurring ? frequency : "Make Recurring",
+                        text: isRecurring ? "Recurring: \(frequency)" : "Recurring",
                         isActive: isRecurring
                     )
                 }

@@ -108,7 +108,7 @@ class BalanceService: BalanceServiceProtocol {
         let request: NSFetchRequest<Transaction> = Transaction.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: true)]
 
-        var startingBalance: Double = 0.0
+        var startingBalance: Double
 
         // OPTIMIZATION: If a date is provided, find the starting state from the previous transaction
         if let fromDate = date {
@@ -119,9 +119,23 @@ class BalanceService: BalanceServiceProtocol {
 
             do {
                 if let lastTransaction = try context.fetch(previousRequest).first {
+                    // Use the balance after the last transaction before this date
                     startingBalance = lastTransaction.balanceAfter
+                } else {
+                    // No previous transaction - check if account has any transactions at all
+                    let anyTransactionRequest: NSFetchRequest<Transaction> = Transaction.fetchRequest()
+                    anyTransactionRequest.predicate = NSPredicate(format: "account == %@", account)
+                    anyTransactionRequest.fetchLimit = 1
+
+                    if try context.fetch(anyTransactionRequest).isEmpty {
+                        // No transactions at all - use account's current balance as opening balance
+                        startingBalance = account.balance
+                    } else {
+                        // Transactions exist but all are after fromDate - start from 0.00
+                        // The first transaction (by date) should be an opening balance adjustment that sets the correct balance
+                        startingBalance = 0.0
+                    }
                 }
-                // If no previous transaction, startingBalance remains 0.0
 
                 // Only fetch transactions to update from this date onwards
                 request.predicate = NSPredicate(format: "account == %@ AND date >= %@", account, fromDate as NSDate)
@@ -129,12 +143,27 @@ class BalanceService: BalanceServiceProtocol {
                 throw ServiceError.operationFailed("Error fetching previous transaction: \(error.localizedDescription)")
             }
         } else {
-            // No date provided, recalculate everything
+            // No date provided, recalculate everything from scratch
+            // Start from 0.00 - the first transaction (opening balance adjustment) will set the correct balance
+            startingBalance = 0.0
             request.predicate = NSPredicate(format: "account == %@", account)
         }
 
         do {
             let transactions = try context.fetch(request)
+
+            // If there are no transactions from this date onwards, update account to starting balance
+            if transactions.isEmpty {
+                // Update account balance to starting balance (e.g., after deleting the last transaction)
+                if account.balance != startingBalance {
+                    account.balance = startingBalance
+                }
+                if context.hasChanges {
+                    try context.save()
+                }
+                return
+            }
+
             var runningBalance = startingBalance
 
             for transaction in transactions {
