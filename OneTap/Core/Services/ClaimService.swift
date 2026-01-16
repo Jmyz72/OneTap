@@ -53,7 +53,7 @@ class ClaimService {
         // Calculate total claimed amount
         let totalClaimed = claims.reduce(0.0) { $0 + $1.amount }
 
-        // 1. Create reimbursement Income transaction
+        // 1. Create reimbursement Income transaction (EXCLUDED - it just returns your money, not real income)
         let reimbursementTransaction = try transactionRepository.createTransaction(
             title: "Reimbursement (\(claims.count) claims)",
             amount: reimbursementAmount,
@@ -65,7 +65,7 @@ class ClaimService {
             merchant: nil,
             notes: "Settled \(claims.count) claims totaling \(Formatters.currencyFormatter(for: toAccount.currency ?? "USD").string(from: NSNumber(value: totalClaimed)) ?? "$0")",
             adjustmentReason: nil,
-            excludeFromReports: false
+            excludeFromReports: true
         )
 
         try transactionRepository.save()
@@ -75,6 +75,7 @@ class ClaimService {
         if abs(reimbursementAmount - totalClaimed) > 0.01 { // Use 0.01 for floating point comparison
             let difference = totalClaimed - reimbursementAmount
 
+            // Adjustment is NOT excluded - the difference is real income/expense
             let adjustmentTransaction = try transactionRepository.createTransaction(
                 title: "Claim Settlement Adjustment",
                 amount: abs(difference),

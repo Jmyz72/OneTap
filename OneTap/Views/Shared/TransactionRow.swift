@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct TransactionRow: View {
-    let transaction: Transaction
+    @ObservedObject var transaction: Transaction
     @State private var isPressed = false
 
     var body: some View {
@@ -44,7 +44,7 @@ struct TransactionRow: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 // Main Text: Category or SubCategory
-                Text(mainDisplayJSON)
+                Text(mainDisplayText)
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(AppTheme.textPrimary)
 
@@ -121,6 +121,17 @@ struct TransactionRow: View {
                             .foregroundColor(AppTheme.textTertiary)
                     }
 
+                    // Claim badge
+                    if transaction.hasPendingClaim {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.orange)
+                    } else if transaction.hasSettledClaim {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.green)
+                    }
+
                     Text(Formatters.time.string(from: transaction.date ?? Date()))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(AppTheme.textTertiary)
@@ -168,7 +179,7 @@ struct TransactionRow: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
     }
     
-    private var mainDisplayJSON: String {
+    private var mainDisplayText: String {
         if let sub = transaction.subCategory?.name {
             return sub
         }

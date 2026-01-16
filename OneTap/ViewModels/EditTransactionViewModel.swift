@@ -29,14 +29,33 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     // Recurring State
     @Published var isRecurring = false
     @Published var frequency = "Monthly"
+    @Published var interval = 1
+    @Published var hasOccurrenceLimit = false
+    @Published var occurrenceLimitString = ""
+    @Published var hasEndDate = false
+    @Published var endDate: Date?
+    @Published var selectedWeekdays: Set<Int> = []
+    @Published var selectedMonthDay: Int = 1
+    @Published var requiresConfirmation = false
+    let frequencies = ["Daily", "Weekly", "Monthly", "Yearly"]
+
+    // Installment State (for credit accounts)
+    @Published var isInstallment = false
+    @Published var installmentPayments: Int16 = 3
+    @Published var installmentBillingDay: Int16 = 1
+    let installmentOptions: [Int16] = [3, 6, 9, 12, 18, 24]
 
     // Exclusion State
     @Published var excludeFromReports: Bool
+
+    // Claim State
+    @Published var markAsClaim = false
 
     // Data from repositories
     @Published var categories: [Category] = []
     @Published var accounts: [Account] = []
     @Published var merchantSuggestions: [String] = []
+    @Published var recentMerchants: [String] = []
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -46,24 +65,33 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
     private let transactionRepository: TransactionRepository
     private let accountRepository: AccountRepository
     private let categoryRepository: CategoryRepository
+    private let claimRepository: ClaimRepository
     private let transferService: TransferService
     private let balanceService: BalanceService
+    private let claimService: ClaimService
     private var cancellables = Set<AnyCancellable>()
+
+    // Track existing claim for deletion handling
+    private var existingClaim: Claim?
 
     init(
         transaction: Transaction,
         transactionRepository: TransactionRepository,
         accountRepository: AccountRepository,
         categoryRepository: CategoryRepository,
+        claimRepository: ClaimRepository,
         transferService: TransferService,
-        balanceService: BalanceService
+        balanceService: BalanceService,
+        claimService: ClaimService
     ) {
         self.transaction = transaction
         self.transactionRepository = transactionRepository
         self.accountRepository = accountRepository
         self.categoryRepository = categoryRepository
+        self.claimRepository = claimRepository
         self.transferService = transferService
         self.balanceService = balanceService
+        self.claimService = claimService
 
         // Initialize state from transaction
         self.amountString = Self.formatAmount(transaction.amount)
@@ -76,6 +104,12 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         self.merchant = transaction.merchant ?? ""
         self.note = transaction.notes ?? ""
         self.excludeFromReports = transaction.excludeFromReports
+
+        // Load existing claim if any
+        if let transactionID = transaction.id {
+            self.existingClaim = claimRepository.fetchClaim(for: transactionID)
+            self.markAsClaim = existingClaim != nil
+        }
 
         // Load data
         loadData()
@@ -109,8 +143,35 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         if splitItems.isEmpty {
             return Double(amountString) ?? 0
         } else {
-            return splitItems.reduce(0) { $0 + $1.amount } + (Double(amountString) ?? 0)
+            // When split items exist, use their sum as the transaction amount
+            return splitItems.reduce(0) { $0 + $1.amount }
         }
+    }
+
+    var occurrenceLimit: Int? {
+        guard hasOccurrenceLimit, let limit = Int(occurrenceLimitString), limit > 0 else {
+            return nil
+        }
+        return limit
+    }
+
+    /// Shows installment option only for credit accounts (Credit Card, BNPL)
+    var showInstallmentOption: Bool {
+        guard let account = selectedAccount else { return false }
+        return account.isLiability && selectedType == .expense
+    }
+
+    /// Monthly payment amount for installment
+    var installmentMonthlyPayment: Double {
+        guard installmentPayments > 0 else { return 0 }
+        return totalAmount / Double(installmentPayments)
+    }
+
+    /// Formatted monthly payment for display
+    var formattedInstallmentPayment: String {
+        let code = selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        return formatter.string(from: NSNumber(value: installmentMonthlyPayment)) ?? "$0"
     }
 
     // MARK: - Data Loading
@@ -119,6 +180,7 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
         // Initial fetch
         accounts = accountRepository.fetchAccounts(group: nil)
         categories = categoryRepository.fetchCategories(type: nil)
+        recentMerchants = transactionRepository.fetchRecentMerchants(limit: 5)
     }
 
     private func observeData() {
@@ -142,6 +204,20 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
                     self?.categories = categories
                 }
             )
+            .store(in: &cancellables)
+
+        // Auto-toggle exclude when claim is toggled
+        $markAsClaim
+            .sink { [weak self] isClaim in
+                guard let self = self else { return }
+                if isClaim {
+                    // When marking as claim, automatically exclude from reports
+                    self.excludeFromReports = true
+                } else {
+                    // When unmarking claim, automatically uncheck exclude
+                    self.excludeFromReports = false
+                }
+            }
             .store(in: &cancellables)
     }
 
@@ -178,6 +254,10 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
 
     func updateMerchantSuggestions() {
         merchantSuggestions = transactionRepository.fetchUniqueMerchants(matching: merchant)
+    }
+
+    func fetchAllMerchants() -> [String] {
+        return transactionRepository.fetchUniqueMerchants(matching: "")
     }
 
     func addSplitItem() {
@@ -270,6 +350,17 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol {
             }
 
             try transactionRepository.save()
+
+            // Handle claim changes
+            if markAsClaim && existingClaim == nil && selectedType == .expense {
+                // Create new claim
+                _ = try claimService.createClaim(from: transaction)
+            } else if !markAsClaim && existingClaim != nil {
+                // Delete existing claim (only if not settled)
+                if let claim = existingClaim, !claim.isSettled {
+                    try claimService.deleteClaim(claim)
+                }
+            }
 
             // Recalculate balances
             let earliestDate = min(oldDate, transactionDate)

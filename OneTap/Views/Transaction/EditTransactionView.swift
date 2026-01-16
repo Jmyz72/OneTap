@@ -82,10 +82,7 @@ private struct EditTransactionContent: View {
                 Button("Done") { }
             }
             .confirmationDialog("Recurring Frequency", isPresented: $showingRecurringPicker, titleVisibility: .visible) {
-                // Since frequencies is not in EditTransactionViewModel yet, I should check it.
-                // Wait, I should add frequencies to EditTransactionViewModel too if I want to use it.
-                // For now I'll use hardcoded values or add it to VM.
-                ForEach(["Daily", "Weekly", "Monthly", "Yearly"], id: \.self) { freq in
+                ForEach(viewModel.frequencies, id: \.self) { freq in
                     Button(freq) {
                         viewModel.frequency = freq
                         viewModel.isRecurring = true
@@ -183,7 +180,9 @@ private struct EditTransactionContent: View {
                                 await viewModel.saveChanges()
                             }
                         },
-                        onAddItem: nil
+                        onAddItem: viewModel.selectedType == .expense ? {
+                            viewModel.addSplitItem()
+                        } : nil
                     )
                     .padding(.bottom, 10)
                 }
@@ -217,12 +216,12 @@ private struct EditTransactionContent: View {
             note: $viewModel.note,
             isRecurring: $viewModel.isRecurring,
             frequency: $viewModel.frequency,
-            isInstallment: .constant(false),
-            showInstallmentOption: false,
-            installmentPayments: 0,
-            formattedInstallmentPayment: "",
+            isInstallment: $viewModel.isInstallment,
+            showInstallmentOption: viewModel.showInstallmentOption,
+            installmentPayments: viewModel.installmentPayments,
+            formattedInstallmentPayment: viewModel.formattedInstallmentPayment,
             excludeFromReports: $viewModel.excludeFromReports,
-            markAsClaim: .constant(false),
+            markAsClaim: $viewModel.markAsClaim,
             selectedType: viewModel.selectedType,
             onSubCategoryTap: {
                 if let category = viewModel.selectedCategory {
@@ -236,7 +235,7 @@ private struct EditTransactionContent: View {
             onRecurringTap: { showingRecurringPicker = true },
             onInstallmentTap: { },
             onExclusionTap: { viewModel.excludeFromReports.toggle() },
-            onClaimTap: { }
+            onClaimTap: { viewModel.markAsClaim.toggle() }
         )
     }
 

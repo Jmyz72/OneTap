@@ -12,7 +12,7 @@ struct TransactionDetailView: View {
     @EnvironmentObject private var container: DependencyContainer
     @Environment(\.dismiss) private var dismiss
 
-    let transaction: Transaction
+    @ObservedObject var transaction: Transaction
     @State private var viewModel: TransactionDetailViewModel?
 
     // UI State
@@ -78,20 +78,32 @@ struct TransactionDetailView: View {
                                 RoundedRectangle(cornerRadius: 0)
                                     .stroke(Color.white.opacity(0.05), lineWidth: 1)
                             )
-
-                            // Action Buttons (outside receipt)
-                            actionButtons()
                         }
+                        .padding(.bottom, 40)
                     }
                 }
                 .navigationTitle("Receipt")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Edit") {
-                            showingEditSheet = true
+                        Menu {
+                            Button {
+                                showingEditSheet = true
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                showingDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundColor(AppTheme.accent)
                         }
-                        .foregroundColor(AppTheme.accent)
                     }
                 }
                 .sheet(isPresented: $showingEditSheet) {
@@ -295,7 +307,7 @@ struct TransactionDetailView: View {
                         .foregroundColor(.gray)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.top, 8)
+                .padding(.vertical, 8)
             }
 
             // Adjustment Reason if present
@@ -309,7 +321,7 @@ struct TransactionDetailView: View {
                         .foregroundColor(.gray)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.top, 8)
+                .padding(.vertical, 8)
             }
         }
     }
@@ -359,13 +371,21 @@ struct TransactionDetailView: View {
                     receiptBadge(icon: "eye.slash", text: "EXCLUDED", color: .orange)
                 }
 
+                if transaction.hasPendingClaim {
+                    receiptBadge(icon: "checkmark.circle.fill", text: "CLAIM PENDING", color: .orange)
+                }
+
+                if transaction.hasSettledClaim {
+                    receiptBadge(icon: "checkmark.circle.fill", text: "CLAIM SETTLED", color: .green)
+                }
+
                 if transaction.typeEnum == .adjustment {
                     receiptBadge(icon: "slider.horizontal.3", text: "ADJUSTMENT", color: .yellow)
                 }
             }
             .padding(.vertical, 8)
 
-            if transaction.isPartOfInstallment || transaction.typeEnum == .transfer || transaction.excludeFromReports || transaction.typeEnum == .adjustment {
+            if transaction.isPartOfInstallment || transaction.typeEnum == .transfer || transaction.excludeFromReports || transaction.hasPendingClaim || transaction.hasSettledClaim || transaction.typeEnum == .adjustment {
                 Divider()
                     .background(Color.white.opacity(0.1))
                     .padding(.vertical, 4)
@@ -405,39 +425,6 @@ struct TransactionDetailView: View {
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-    }
-
-    private func actionButtons() -> some View {
-        VStack(spacing: 12) {
-            Button {
-                showingDeleteConfirmation = true
-            } label: {
-                HStack {
-                    Image(systemName: "trash")
-                    Text("Delete Transaction")
-                }
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    LinearGradient(
-                        colors: [Color.red.opacity(0.8), Color.red.opacity(0.6)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                )
-            }
-            .disabled(viewModel?.loadingState.isLoading ?? false)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 40)
     }
 
     // MARK: - Helper Views
