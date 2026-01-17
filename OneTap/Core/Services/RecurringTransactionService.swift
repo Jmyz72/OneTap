@@ -426,14 +426,34 @@ class RecurringTransactionService {
         }
 
         let now = Date()
+        let planID = UUID()
+
+        // PHASE 1: Create principal transaction (the initial purchase)
+        // This represents the debt incurred on the credit card
+        // Excluded from reports to avoid showing full amount in month 1
+        let principalTransaction = try transactionRepository.createTransaction(
+            title: title,
+            amount: totalAmount,
+            type: .expense,
+            date: startDate,
+            account: account,
+            category: category,
+            subCategory: subCategory,
+            merchant: merchant,
+            notes: notes
+        )
+        principalTransaction.excludeFromReports = true  // CRITICAL: Hide from expense analytics
+        principalTransaction.installmentPlanID = planID
+        principalTransaction.installmentNumber = 0  // Principal marker
 
         // Create RecurringTransaction (the installment plan)
+        // Generates monthly expense transactions for budget tracking
         let plan = RecurringTransaction(context: context)
-        plan.id = UUID()
+        plan.id = planID
         plan.title = title
         plan.amount = paymentAmount
         plan.totalAmount = totalAmount
-        plan.type = TransactionType.expense.rawValue
+        plan.type = TransactionType.expense.rawValue  // Monthly expenses for tracking
         plan.frequency = "Monthly"
         plan.interval = 1
         plan.isActive = true
@@ -520,10 +540,8 @@ class RecurringTransactionService {
 
         try context.save()
 
-        // Recalculate balances if first payment was made
-        if let transaction = firstTransaction {
-            try await balanceService.recalculateBalances(for: account.objectID, from: transaction.date ?? now)
-        }
+        // Recalculate balances for credit card account
+        try await balanceService.recalculateBalances(for: account.objectID, from: startDate)
 
         return (plan, firstTransaction)
     }
@@ -689,7 +707,7 @@ class RecurringTransactionService {
             throw ServiceError.operationFailed("No remaining balance to pay off")
         }
 
-        // Create final payoff transaction
+        // Create final payoff transaction as expense (for budget tracking)
         let payoffTransaction = try transactionRepository.createTransaction(
             title: "\(plan.title ?? "Installment") - Early Payoff",
             amount: remainingAmount,

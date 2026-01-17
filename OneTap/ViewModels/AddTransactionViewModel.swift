@@ -204,6 +204,20 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPick
                 }
             }
             .store(in: &cancellables)
+
+        // Auto-toggle exclude when installment is toggled
+        $isInstallment
+            .sink { [weak self] isInstallment in
+                guard let self = self else { return }
+                if isInstallment {
+                    // When marking as installment, automatically exclude from reports
+                    self.excludeFromReports = true
+                } else {
+                    // When unmarking installment, automatically uncheck exclude
+                    self.excludeFromReports = false
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Actions

@@ -85,7 +85,7 @@ struct TransactionMiddleBar: View {
                         isActive: excludeFromReports
                     )
                 }
-                .disabled(markAsClaim)
+                .disabled(markAsClaim || isInstallment)
 
                 // Claim Chip (Expense only)
                 if selectedType == .expense {

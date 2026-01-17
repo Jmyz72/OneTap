@@ -198,7 +198,14 @@ class BalanceService: BalanceServiceProtocol {
 
         switch type {
         case .expense:
-            // Expense decreases balance
+            // CRITICAL: Installment payment expenses (installmentNumber > 0) don't reduce balance
+            // Only the principal transaction (installmentNumber = 0) reduces the balance
+            // Monthly recurring expenses are for budget tracking only
+            if transaction.installmentNumber > 0 {
+                // This is an installment payment for budget tracking - don't change balance
+                return balance
+            }
+            // Regular expense or principal transaction - decreases balance
             return balance - amount
 
         case .income:
