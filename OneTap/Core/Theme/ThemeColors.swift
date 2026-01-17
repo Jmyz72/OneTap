@@ -50,6 +50,7 @@ struct AppTheme {
     static let claimPending = Color(red: 1.0, green: 0.8, blue: 0.0) // Amber
     static let claimSettled = Color(red: 0.35, green: 0.78, blue: 0.98) // Teal
     static let excluded = Color(red: 0.56, green: 0.56, blue: 0.58) // Gray
+    static let scanned = Color(red: 0.25, green: 0.65, blue: 1.0) // Bright Blue
 
     // Modern Gradient Backgrounds
     static let cardGradient = LinearGradient(

@@ -114,17 +114,38 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
                 self.note = notes
             }
 
-            // 5. Convert line items to SplitItemData
+            // ENHANCED: 5. Convert line items to SplitItemData with smart categorization
             if !extracted.lineItems.isEmpty {
-                splitItems = extracted.lineItems.map { item in
-                    SplitItemData(
+                // Filter out tax/service charge items (they're tracked separately)
+                let actualItems = extracted.lineItems.filter { !$0.isTaxOrCharge }
+
+                splitItems = actualItems.map { item in
+                    // Use suggested category if available, otherwise default to main category
+                    var itemCategory = selectedCategory
+
+                    if let suggestedCategoryName = item.suggestedCategory {
+                        // Find the category by name
+                        if let matchedCategory = categories.first(where: { $0.name == suggestedCategoryName }) {
+                            itemCategory = matchedCategory
+                        }
+                    }
+
+                    return SplitItemData(
                         title: item.title,
                         amount: item.amount,
-                        category: selectedCategory, // Default to main category
+                        category: itemCategory,  // ENHANCED: Use smart-suggested category
                         subCategory: nil
                     )
                 }
-                hasSplitItems = true
+                hasSplitItems = !splitItems.isEmpty
+
+                // If we have tax or service charges, add them to notes
+                if let tax = extracted.taxAmount {
+                    note += "\nTax: RM \(String(format: "%.2f", tax))"
+                }
+                if let serviceCharge = extracted.serviceChargeAmount {
+                    note += "\nService Charge: RM \(String(format: "%.2f", serviceCharge))"
+                }
             } else {
                 splitItems = []
                 hasSplitItems = false
@@ -205,7 +226,8 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
                 merchant: merchant.isEmpty ? nil : merchant,
                 notes: note.isEmpty ? nil : note,
                 adjustmentReason: nil,
-                excludeFromReports: false
+                excludeFromReports: false,
+                isFromOCR: true  // Mark this transaction as created from OCR
             )
 
             // Add split items if available

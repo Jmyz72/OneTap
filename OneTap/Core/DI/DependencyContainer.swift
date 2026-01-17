@@ -35,7 +35,13 @@ final class DependencyContainer: ObservableObject {
     let recurringTransactionService: RecurringTransactionService
     let budgetService: BudgetService
     let claimService: ClaimService
+    let imagePreprocessingService: ImagePreprocessingService
     let ocrService: OCRService
+    let itemCategorizationService: ItemCategorizationService
+    let receiptFormatDetectionService: ReceiptFormatDetectionService
+    let fuzzyMatchingService: FuzzyMatchingService  // PHASE 3
+    let receiptValidationService: ReceiptValidationService  // PHASE 3
+    let ocrLearningService: OCRLearningService  // PHASE 3
     let transactionExtractionService: TransactionExtractionService
     let categoryMatchingService: CategoryMatchingService
 
@@ -76,8 +82,20 @@ final class DependencyContainer: ObservableObject {
             transactionRepository: transactionRepository,
             balanceService: balanceService
         )
-        self.ocrService = OCRService()
-        self.transactionExtractionService = TransactionExtractionService()
+        self.imagePreprocessingService = ImagePreprocessingService()
+        self.ocrService = OCRService(imagePreprocessingService: imagePreprocessingService)
+        self.itemCategorizationService = ItemCategorizationService(categoryRepository: categoryRepository)
+        self.receiptFormatDetectionService = ReceiptFormatDetectionService()
+        self.fuzzyMatchingService = FuzzyMatchingService()  // PHASE 3
+        self.receiptValidationService = ReceiptValidationService()  // PHASE 3
+        self.ocrLearningService = OCRLearningService(context: context)  // PHASE 3
+        self.transactionExtractionService = TransactionExtractionService(
+            itemCategorizationService: itemCategorizationService,
+            receiptFormatDetectionService: receiptFormatDetectionService,
+            fuzzyMatchingService: fuzzyMatchingService,  // PHASE 3
+            validationService: receiptValidationService,  // PHASE 3
+            learningService: ocrLearningService  // PHASE 3
+        )
         self.categoryMatchingService = CategoryMatchingService(categoryRepository: categoryRepository)
     }
 
@@ -238,6 +256,13 @@ final class DependencyContainer: ObservableObject {
             categoryRepository: categoryRepository,
             balanceService: balanceService,
             validationService: validationService
+        )
+    }
+
+    func makeScanReceiptViewModel() -> ScanReceiptViewModel {
+        ScanReceiptViewModel(
+            transactionRepository: transactionRepository,
+            viewContext: persistenceController.container.viewContext
         )
     }
 }

@@ -63,6 +63,9 @@ private struct HomeContent: View {
                         // Today Header
                         todayHeaderSection
 
+                        // Hero Card - Net Worth Summary
+                        heroCardSection
+
                         // Quick Actions
                         quickActionsSection
 
@@ -132,6 +135,119 @@ private struct HomeContent: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
         return formatter.string(from: Date())
+    }
+
+    // MARK: - Hero Card
+
+    private var heroCardSection: some View {
+        VStack(spacing: 0) {
+            // Main Balance Display
+            VStack(spacing: 8) {
+                Text("NET WORTH")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(1.5)
+                    .foregroundColor(AppTheme.textSecondary)
+
+                Text(viewModel.formattedNetWorth)
+                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .gradientForeground(
+                        LinearGradient(
+                            colors: [AppTheme.accent, AppTheme.secondaryAccent],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .shadow(color: AppTheme.accent.opacity(0.3), radius: 8, x: 0, y: 4)
+            }
+            .padding(.top, 24)
+            .padding(.bottom, 16)
+
+            // Breakdown
+            HStack(spacing: 0) {
+                // Assets
+                VStack(spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.income)
+
+                        Text("Assets")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+
+                    Text(viewModel.formattedTotalAssets)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(AppTheme.textPrimary)
+                }
+                .frame(maxWidth: .infinity)
+
+                // Divider
+                Rectangle()
+                    .fill(AppTheme.textTertiary.opacity(0.2))
+                    .frame(width: 1, height: 32)
+
+                // Liabilities
+                VStack(spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.expense)
+
+                        Text("Liabilities")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+
+                    Text(viewModel.formattedTotalLiabilities)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(AppTheme.textPrimary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.bottom, 20)
+        }
+        .frame(maxWidth: .infinity)
+        .background(
+            ZStack {
+                // Gradient background
+                LinearGradient(
+                    colors: [
+                        AppTheme.cardBackground,
+                        AppTheme.secondaryBackground
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                // Accent glow
+                LinearGradient(
+                    colors: [
+                        AppTheme.accent.opacity(0.1),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        )
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.2),
+                            Color.white.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+        .shadow(color: AppTheme.accent.opacity(0.15), radius: 15, x: 0, y: 5)
     }
 
     // MARK: - Quick Actions (Compact)
@@ -232,9 +348,25 @@ private struct HomeContent: View {
                 .padding(.top, 4)
             }
         }
-        .padding(14)
-        .background(AppTheme.cardBackground)
-        .cornerRadius(12)
+        .padding(16)
+        .background(
+            ZStack {
+                AppTheme.cardGradient
+
+                // Subtle glow
+                LinearGradient(
+                    colors: [AppTheme.expense.opacity(0.05), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        )
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppTheme.glassGradient, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
     }
 
     // MARK: - Needs Attention
@@ -333,9 +465,23 @@ private struct HomeContent: View {
                 }
             }
         }
-        .padding(14)
-        .background(AppTheme.cardBackground)
-        .cornerRadius(12)
+        .padding(16)
+        .background(
+            ZStack {
+                AppTheme.cardGradient
+                LinearGradient(
+                    colors: [Color.orange.opacity(0.05), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        )
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppTheme.glassGradient, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
     }
 
     // MARK: - Pending Claims
@@ -390,9 +536,23 @@ private struct HomeContent: View {
                 }
             }
         }
-        .padding(14)
-        .background(AppTheme.cardBackground)
-        .cornerRadius(12)
+        .padding(16)
+        .background(
+            ZStack {
+                AppTheme.cardGradient
+                LinearGradient(
+                    colors: [AppTheme.accent.opacity(0.05), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        )
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppTheme.glassGradient, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
     }
 
     // MARK: - Savings Goals
@@ -448,9 +608,23 @@ private struct HomeContent: View {
                 }
             }
         }
-        .padding(14)
-        .background(AppTheme.cardBackground)
-        .cornerRadius(12)
+        .padding(16)
+        .background(
+            ZStack {
+                AppTheme.cardGradient
+                LinearGradient(
+                    colors: [AppTheme.income.opacity(0.05), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        )
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppTheme.glassGradient, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
     }
 
     // MARK: - Helpers
@@ -518,19 +692,37 @@ private struct TodayStatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(AppTheme.textSecondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
 
             Text(amount)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .black, design: .rounded))
                 .foregroundColor(color)
+                .shadow(color: color.opacity(0.3), radius: 4, x: 0, y: 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(AppTheme.secondaryBackground)
-        .cornerRadius(10)
+        .padding(14)
+        .background(
+            ZStack {
+                AppTheme.secondaryBackground
+
+                // Color accent
+                LinearGradient(
+                    colors: [color.opacity(0.08), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        )
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(color.opacity(0.2), lineWidth: 1)
+        )
     }
 }
 

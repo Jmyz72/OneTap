@@ -155,7 +155,8 @@ class TransactionRepository: BaseRepository {
         merchant: String? = nil,
         notes: String?,
         adjustmentReason: String? = nil,
-        excludeFromReports: Bool = false
+        excludeFromReports: Bool = false,
+        isFromOCR: Bool = false
     ) throws -> Transaction {
         // CRITICAL: Adjustment transactions must have a reason for audit trail
         if type == .adjustment {
@@ -180,6 +181,7 @@ class TransactionRepository: BaseRepository {
         transaction.notes = notes
         transaction.adjustmentReason = adjustmentReason
         transaction.excludeFromReports = excludeFromReports
+        transaction.setValue(isFromOCR, forKey: "isFromOCR")  // Set using KVC until Core Data entity is updated
         transaction.createdAt = Date()
         transaction.updatedAt = Date()
         transaction.balanceAfter = 0 // Will be calculated by BalanceService

@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+@preconcurrency internal import CoreData
 
 struct TransactionRow: View {
     @ObservedObject var transaction: Transaction
@@ -87,25 +88,22 @@ struct TransactionRow: View {
                     .gradientForeground(amountGradient)
 
                 HStack(spacing: 4) {
-                    // Feature badges (installment has priority over recurring)
-                    if transaction.isPartOfInstallment, let label = transaction.installmentLabel {
-                        HStack(spacing: 3) {
-                            Image(systemName: "creditcard.fill")
-                                .font(.system(size: 8, weight: .bold))
-                            Text(label)
-                                .font(.system(size: 9, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(AppTheme.installment)
-                        )
+                    // Feature badges (installment has priority over recurring) - icon only to save space
+                    if transaction.isPartOfInstallment {
+                        Image(systemName: "creditcard.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppTheme.installment)
                     } else if transaction.recurringTransaction != nil {
                         Image(systemName: "repeat")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(AppTheme.recurring)
+                    }
+
+                    // Scanned receipt badge (icon only to save space)
+                    if isFromOCR {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppTheme.scanned)
                     }
 
                     // Claim badges
@@ -214,5 +212,10 @@ struct TransactionRow: View {
                 endPoint: .trailing
             )
         }
+    }
+
+    private var isFromOCR: Bool {
+        // Use KVC to check isFromOCR until Core Data entity is updated
+        (transaction.value(forKey: "isFromOCR") as? Bool) ?? false
     }
 }

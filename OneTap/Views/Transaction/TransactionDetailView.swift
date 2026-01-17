@@ -207,6 +207,25 @@ struct TransactionDetailView: View {
                     .foregroundColor(.gray.opacity(0.8))
                     .padding(.top, 4)
             }
+
+            // Scanned Receipt Badge
+            if isFromOCR {
+                HStack(spacing: 4) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("SCANNED RECEIPT")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .tracking(0.5)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(AppTheme.scanned)
+                )
+                .padding(.top, 8)
+            }
         }
         .padding(.vertical, 12)
     }
@@ -366,8 +385,8 @@ struct TransactionDetailView: View {
                     receiptBadge(icon: "repeat", text: "RECURRING", color: AppTheme.recurring)
                 }
 
-                if transaction.isPartOfInstallment {
-                    receiptBadge(icon: "creditcard.fill", text: "INSTALLMENT", color: AppTheme.installment)
+                if transaction.isPartOfInstallment, let label = transaction.installmentLabel {
+                    receiptBadge(icon: "creditcard.fill", text: label.uppercased(), color: AppTheme.installment)
                 }
 
                 if transaction.hasPendingClaim {
@@ -482,6 +501,11 @@ struct TransactionDetailView: View {
         case .transfer: return Color(hex: "4DABF7") // Soft blue
         case .adjustment: return Color(hex: "FFD43B") // Soft yellow
         }
+    }
+
+    private var isFromOCR: Bool {
+        // Use KVC to check isFromOCR until Core Data entity is updated
+        (transaction.value(forKey: "isFromOCR") as? Bool) ?? false
     }
 }
 

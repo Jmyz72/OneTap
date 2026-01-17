@@ -92,6 +92,11 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         formatCurrency(totalLiabilities)
     }
 
+    var formattedNetWorth: String {
+        let netWorth = totalAssets - totalLiabilities
+        return formatCurrency(netWorth)
+    }
+
     var formattedMonthlyIncome: String {
         formatCurrency(monthlyIncome)
     }
