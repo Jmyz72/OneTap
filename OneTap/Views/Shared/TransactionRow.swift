@@ -215,7 +215,6 @@ struct TransactionRow: View {
     }
 
     private var isFromOCR: Bool {
-        // Use KVC to check isFromOCR until Core Data entity is updated
-        (transaction.value(forKey: "isFromOCR") as? Bool) ?? false
+        transaction.isFromOCR
     }
 }

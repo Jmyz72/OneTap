@@ -38,18 +38,14 @@ class ScanReceiptViewModel: ObservableObject, ViewModelProtocol {
     func loadRecentTransactions() {
         startLoading()
 
-        do {
-            // Filter to only show OCR-imported transactions
-            let predicate = NSPredicate(format: "isFromOCR == YES")
-            let sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
-            let ocrTransactions = transactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
+        // Filter to only show OCR-imported transactions
+        let predicate = NSPredicate(format: "isFromOCR == YES")
+        let sortDescriptors = [NSSortDescriptor(keyPath: \Transaction.date, ascending: false)]
+        let ocrTransactions = transactionRepository.fetch(predicate: predicate, sortDescriptors: sortDescriptors)
 
-            // Take only the 10 most recent OCR transactions
-            recentTransactions = Array(ocrTransactions.prefix(10))
+        // Take only the 10 most recent OCR transactions
+        recentTransactions = Array(ocrTransactions.prefix(10))
 
-            finishLoading()
-        } catch {
-            handleError(error)
-        }
+        finishLoading()
     }
 }

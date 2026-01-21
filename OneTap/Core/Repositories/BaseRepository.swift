@@ -44,7 +44,7 @@ extension BaseRepository {
     func findByID(_ id: NSManagedObjectID) -> Entity? {
         do {
             return try context.existingObject(with: id) as? Entity
-        } catch {
+        } catch _ {
             return nil
         }
     }

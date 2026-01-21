@@ -25,7 +25,8 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPick
     @Published var merchant = ""
     @Published var note = ""
     @Published var splitItems: [SplitItemData] = []
-    
+    @Published var adjustments: [AdjustmentData] = []
+
     // Recurring State
     @Published var isRecurring = false
     @Published var frequency = "Monthly"
@@ -165,6 +166,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPick
     private func observeData() {
         // Observe accounts
         accountRepository.accountsPublisher()
+            .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in },
@@ -180,6 +182,7 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPick
 
         // Observe categories
         categoryRepository.categoriesPublisher(type: nil)
+            .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { _ in },
@@ -193,28 +196,38 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPick
 
         // Auto-toggle exclude when claim is toggled
         $markAsClaim
+            .dropFirst()
+            .removeDuplicates()
             .sink { [weak self] isClaim in
                 guard let self = self else { return }
-                if isClaim {
-                    // When marking as claim, automatically exclude from reports
-                    self.excludeFromReports = true
-                } else {
-                    // When unmarking claim, automatically uncheck exclude
-                    self.excludeFromReports = false
+                // Only modify if not controlled by installment
+                if !self.isInstallment {
+                    if isClaim {
+                        // When marking as claim, automatically exclude from reports
+                        self.excludeFromReports = true
+                    } else {
+                        // When unmarking claim, automatically uncheck exclude
+                        self.excludeFromReports = false
+                    }
                 }
             }
             .store(in: &cancellables)
 
-        // Auto-toggle exclude when installment is toggled
+        // Auto-toggle exclude when installment is toggled (takes priority over claim)
         $isInstallment
+            .dropFirst()
+            .removeDuplicates()
             .sink { [weak self] isInstallment in
                 guard let self = self else { return }
                 if isInstallment {
                     // When marking as installment, automatically exclude from reports
                     self.excludeFromReports = true
                 } else {
-                    // When unmarking installment, automatically uncheck exclude
-                    self.excludeFromReports = false
+                    // When unmarking installment, check if claim is active
+                    if !self.markAsClaim {
+                        // Only uncheck if claim is also inactive
+                        self.excludeFromReports = false
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -433,6 +446,11 @@ class AddTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPick
                     // Add split items if any
                     if !splitItems.isEmpty {
                         try transactionRepository.addSplitItems(splitItems, to: transaction)
+                    }
+
+                    // Add adjustments if any
+                    if !adjustments.isEmpty {
+                        try transactionRepository.addAdjustments(adjustments, to: transaction)
                     }
 
                     try transactionRepository.save()

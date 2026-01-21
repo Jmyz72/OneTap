@@ -39,14 +39,30 @@ class TransactionExtractionService {
         }
     }
 
+    /// Structured adjustment extracted from receipt
+    struct ExtractedAdjustment {
+        let type: AdjustmentType
+        let amount: Double
+        let label: String?
+        let percentage: Double?
+
+        init(type: AdjustmentType, amount: Double, label: String? = nil, percentage: Double? = nil) {
+            self.type = type
+            self.amount = amount
+            self.label = label
+            self.percentage = percentage
+        }
+    }
+
     struct ExtractedTransaction {
         var amount: Double?
         var merchant: String?
         var date: Date?
         var notes: String?
         var lineItems: [ExtractedLineItem]
-        var taxAmount: Double?  // ENHANCED: Separate tax tracking
-        var serviceChargeAmount: Double?  // ENHANCED: Separate service charge
+        var adjustments: [ExtractedAdjustment] = []  // ENHANCED: Structured adjustments
+        var taxAmount: Double?  // Legacy: kept for backwards compatibility
+        var serviceChargeAmount: Double?  // Legacy: kept for backwards compatibility
         var receiptFormat: ReceiptFormatDetectionService.ReceiptFormat?  // ENHANCED: Detected format
         var confidence: ConfidenceLevel
 
@@ -122,7 +138,10 @@ class TransactionExtractionService {
         // 3. Extract Date
         extracted.date = extractDate(from: cleanedText)
 
-        // ENHANCED: 4. Extract Tax and Service Charges
+        // ENHANCED: 4. Extract Adjustments (Tax, Service Charge, Discount, Rounding)
+        extracted.adjustments = extractAdjustments(from: cleanedLines, format: extracted.receiptFormat)
+
+        // Legacy: Also populate individual fields for backwards compatibility
         let (tax, serviceCharge) = extractTaxAndServiceCharge(from: cleanedLines, format: extracted.receiptFormat)
         extracted.taxAmount = tax
         extracted.serviceChargeAmount = serviceCharge
@@ -443,6 +462,25 @@ class TransactionExtractionService {
             }
         }
 
+        // ENHANCED: Skip company registration names (SDN. BHD., BHD., etc.)
+        // These are corporate names, not store/brand names
+        let companyPatterns = [
+            "sdn\\.?\\s*bhd\\.?",      // SDN. BHD. or SDN BHD
+            "\\bbhd\\.?\\b",            // BHD. or BHD
+            "\\bsdn\\.?\\b",            // SDN. or SDN (alone)
+            "\\bpte\\.?\\s*ltd\\.?\\b", // PTE. LTD. (Singapore)
+            "\\bllc\\b",                // LLC
+            "\\binc\\b",                // Inc
+            "\\bcorp\\b",               // Corp
+            "\\(\\d{5,}-[A-Z]\\)",      // Company registration number pattern (123456-P)
+        ]
+
+        for pattern in companyPatterns {
+            if lowercased.range(of: pattern, options: .regularExpression) != nil {
+                return true
+            }
+        }
+
         // Skip lines that look like dates (contains /)
         if line.contains("/") || line.contains("-") && line.count < 15 {
             // Check if it's a date pattern
@@ -531,9 +569,142 @@ class TransactionExtractionService {
         return Date()
     }
 
-    // MARK: - Tax and Service Charge Extraction
+    // MARK: - Adjustments Extraction
 
-    /// ENHANCED: Extracts tax and service charge amounts separately
+    /// Extracts all adjustments (tax, service charge, discount, rounding) from receipt
+    private func extractAdjustments(
+        from lines: [String],
+        format: ReceiptFormatDetectionService.ReceiptFormat?
+    ) -> [ExtractedAdjustment] {
+        var adjustments: [ExtractedAdjustment] = []
+
+        // Tax patterns with label extraction
+        let taxPatterns: [(pattern: String, labelPattern: String?)] = [
+            ("(?:SST|GST|VAT)\\s*(\\d+)?%?\\s*:?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", "SST|GST|VAT"),
+            ("Tax\\s*(?:\\(?(\\d+)%\\)?)?\\s*:?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Sales\\s*Tax\\s*(?:\\(?(\\d+)%\\)?)?\\s*:?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+        ]
+
+        // Service charge patterns
+        let serviceChargePatterns: [(pattern: String, labelPattern: String?)] = [
+            ("Service\\s*Charge\\s*(?:\\(?(\\d+)%\\)?)?\\s*:?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Svc\\s*Charge\\s*(?:\\(?(\\d+)%\\)?)?\\s*:?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Service\\s*(\\d+)?%?\\s*:?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+        ]
+
+        // Discount patterns (negative adjustments)
+        let discountPatterns: [(pattern: String, labelPattern: String?)] = [
+            ("Discount\\s*(?:\\(?(\\d+)%\\)?)?\\s*:?\\s*-?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Promo\\s*(?:Discount)?\\s*:?\\s*-?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Member\\s*Discount\\s*:?\\s*-?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Voucher\\s*:?\\s*-?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+        ]
+
+        // Rounding patterns
+        let roundingPatterns: [(pattern: String, labelPattern: String?)] = [
+            ("Rounding\\s*(?:Adj(?:ustment)?)?\\s*:?\\s*-?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Round(?:ing)?\\s*:?\\s*-?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+            ("Adj(?:ustment)?\\s*:?\\s*-?\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})", nil),
+        ]
+
+        // Extract tax
+        for line in lines {
+            if let adjustment = extractAdjustment(from: line, patterns: taxPatterns, type: .tax) {
+                adjustments.append(adjustment)
+                break
+            }
+        }
+
+        // Extract service charge
+        for line in lines {
+            if let adjustment = extractAdjustment(from: line, patterns: serviceChargePatterns, type: .serviceCharge) {
+                adjustments.append(adjustment)
+                break
+            }
+        }
+
+        // Extract discounts (can have multiple)
+        for line in lines {
+            if let adjustment = extractAdjustment(from: line, patterns: discountPatterns, type: .discount) {
+                // Check if we already have this discount (avoid duplicates)
+                if !adjustments.contains(where: { $0.type == .discount && $0.amount == adjustment.amount }) {
+                    adjustments.append(adjustment)
+                }
+            }
+        }
+
+        // Extract rounding
+        for line in lines {
+            if let adjustment = extractAdjustment(from: line, patterns: roundingPatterns, type: .rounding) {
+                adjustments.append(adjustment)
+                break
+            }
+        }
+
+        return adjustments
+    }
+
+    /// Helper to extract a single adjustment from a line
+    private func extractAdjustment(
+        from line: String,
+        patterns: [(pattern: String, labelPattern: String?)],
+        type: AdjustmentType
+    ) -> ExtractedAdjustment? {
+        for (pattern, _) in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+                continue
+            }
+
+            let nsRange = NSRange(line.startIndex..<line.endIndex, in: line)
+            guard let match = regex.firstMatch(in: line, options: [], range: nsRange) else {
+                continue
+            }
+
+            // Try to extract percentage (usually capture group 1)
+            var percentage: Double? = nil
+            if match.numberOfRanges > 2 {
+                let percentRange = match.range(at: 1)
+                if percentRange.location != NSNotFound,
+                   let swiftRange = Range(percentRange, in: line) {
+                    percentage = Double(String(line[swiftRange]))
+                }
+            }
+
+            // Extract amount (usually last capture group)
+            let amountGroupIndex = match.numberOfRanges - 1
+            let amountRange = match.range(at: amountGroupIndex)
+            guard amountRange.location != NSNotFound,
+                  let amountSwiftRange = Range(amountRange, in: line) else {
+                continue
+            }
+
+            var amountString = String(line[amountSwiftRange])
+            amountString = amountString.replacingOccurrences(of: ",", with: "")
+
+            guard let amount = Double(amountString), amount > 0 else {
+                continue
+            }
+
+            // Generate label
+            var label: String? = nil
+            if let pct = percentage, pct > 0 {
+                label = "\(type.displayName) \(Int(pct))%"
+            }
+
+            return ExtractedAdjustment(
+                type: type,
+                amount: amount,
+                label: label,
+                percentage: percentage
+            )
+        }
+
+        return nil
+    }
+
+    // MARK: - Tax and Service Charge Extraction (Legacy)
+
+    /// Legacy method for backwards compatibility - extracts tax and service charge amounts separately
     private func extractTaxAndServiceCharge(
         from lines: [String],
         format: ReceiptFormatDetectionService.ReceiptFormat?
@@ -582,6 +753,13 @@ class TransactionExtractionService {
 
     // MARK: - Line Item Extraction
 
+    /// Common modifiers that indicate order type, not the actual item name
+    private let orderModifiers = [
+        "take away", "takeaway", "ta",
+        "dine in", "dine-in", "dinein", "di",
+        "delivery", "grab", "foodpanda", "shopeefood"
+    ]
+
     /// ENHANCED: Extracts line items with quantity detection and smart categorization
     private func extractLineItems(
         from lines: [String],
@@ -596,9 +774,10 @@ class TransactionExtractionService {
             "^(.+?)\\s+MYR\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})$",     // "Coffee MYR 8.00"
             "^(.+?)\\s+(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})$",            // "Coffee 8.00"
             "^(.+?)\\s+@\\s*RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})$", // "Coffee @ RM 8.00"
+            "^-?\\s*(.+?)\\s+RM\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})$", // "- Take Away RM 8.00"
         ]
 
-        for line in lines {
+        for (index, line) in lines.enumerated() {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // Skip empty lines
@@ -611,7 +790,33 @@ class TransactionExtractionService {
 
             // Try to match item patterns
             for pattern in itemPatterns {
-                if let item = extractLineItem(from: trimmed, pattern: pattern) {
+                if var item = extractLineItem(from: trimmed, pattern: pattern) {
+                    // ENHANCED: Check if item name is just a modifier (Take Away, Dine In, etc.)
+                    // If so, look at the previous line for the actual item name
+                    let itemNameLower = item.title.lowercased()
+                    let isModifier = orderModifiers.contains { itemNameLower.contains($0) }
+
+                    if isModifier && index > 0 {
+                        // Look at previous line for actual item name
+                        let previousLine = lines[index - 1].trimmingCharacters(in: .whitespacesAndNewlines)
+
+                        // Try to extract item name from previous line (may have quantity prefix)
+                        if let actualItemName = extractItemNameFromPreviousLine(previousLine) {
+                            // Combine: "Tau Foo Fa" + "Take Away" → "Tau Foo Fa (Take Away)"
+                            let modifier = extractModifierName(from: item.title)
+                            let combinedTitle = "\(actualItemName) (\(modifier))"
+
+                            item = ExtractedLineItem(
+                                title: combinedTitle,
+                                amount: item.amount,
+                                quantity: item.quantity,
+                                unitPrice: item.unitPrice,
+                                isTaxOrCharge: item.isTaxOrCharge,
+                                suggestedCategory: item.suggestedCategory
+                            )
+                        }
+                    }
+
                     lineItems.append(item)
                     break // Found a match, no need to try other patterns
                 }
@@ -631,7 +836,154 @@ class TransactionExtractionService {
             }
         }
 
+        // FALLBACK: If no items found, try columnar format extraction
+        // Some receipts have item names in one column and amounts in another
+        if lineItems.isEmpty, let total = totalAmount {
+            let columnarItems = extractColumnarLineItems(from: lines, totalAmount: total)
+            if !columnarItems.isEmpty {
+                return columnarItems
+            }
+        }
+
         return lineItems
+    }
+
+    /// Extracts line items from columnar receipt format
+    /// (item names on left, amounts on right - read as separate lines by OCR)
+    private func extractColumnarLineItems(
+        from lines: [String],
+        totalAmount: Double
+    ) -> [ExtractedLineItem] {
+        var potentialItemNames: [String] = []
+        var potentialAmounts: [Double] = []
+
+        // Pattern for standalone amount (just a number like "1.20" or "2.20")
+        let standaloneAmountPattern = "^\\s*(\\d{1,}(?:[,\\.]\\d{3})*\\.\\d{2})\\s*$"
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+
+            // Skip lines we should skip
+            if shouldSkipLineItem(trimmed) {
+                continue
+            }
+
+            // Check if line is just an amount
+            if let regex = try? NSRegularExpression(pattern: standaloneAmountPattern, options: []),
+               let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) {
+                let amountRange = match.range(at: 1)
+                if amountRange.location != NSNotFound,
+                   let amountSwiftRange = Range(amountRange, in: trimmed) {
+                    let amountString = String(trimmed[amountSwiftRange]).replacingOccurrences(of: ",", with: "")
+                    if let amount = Double(amountString), amount > 0, amount < totalAmount {
+                        potentialAmounts.append(amount)
+                        continue
+                    }
+                }
+            }
+
+            // Check if line looks like an item name (has letters, no currency)
+            let hasLetters = trimmed.contains(where: { $0.isLetter })
+            let hasCurrency = trimmed.contains("RM") || trimmed.contains("MYR")
+            let hasAmount = trimmed.range(of: "\\d+\\.\\d{2}", options: .regularExpression) != nil
+
+            if hasLetters && !hasCurrency && !hasAmount && trimmed.count >= 3 && trimmed.count <= 50 {
+                // This looks like a potential item name
+                potentialItemNames.append(trimmed)
+            }
+        }
+
+        // If we have matching counts of names and amounts, pair them
+        guard !potentialItemNames.isEmpty,
+              potentialItemNames.count == potentialAmounts.count else {
+            return []
+        }
+
+        // Validate: sum of amounts should be close to total
+        let sum = potentialAmounts.reduce(0, +)
+        let difference = abs(sum - totalAmount)
+        let tolerance = totalAmount * 0.15 // 15% tolerance
+
+        guard difference <= tolerance || difference <= 2.0 else {
+            return []
+        }
+
+        // Create line items by pairing names with amounts
+        var lineItems: [ExtractedLineItem] = []
+        for (index, itemName) in potentialItemNames.enumerated() {
+            let amount = potentialAmounts[index]
+
+            // Get suggested category
+            var suggestedCategory: String? = nil
+            if let categorizationService = itemCategorizationService {
+                suggestedCategory = categorizationService.suggestCategory(forItemTitle: itemName)?.name
+            }
+
+            lineItems.append(ExtractedLineItem(
+                title: itemName,
+                amount: amount,
+                quantity: 1,
+                unitPrice: amount,
+                isTaxOrCharge: false,
+                suggestedCategory: suggestedCategory
+            ))
+        }
+
+        return lineItems
+    }
+
+    /// Extracts item name from a line that may have quantity prefix (e.g., "1x Tau Foo Fa")
+    private func extractItemNameFromPreviousLine(_ line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Skip if line is empty or too short
+        guard trimmed.count >= 2 else { return nil }
+
+        // Skip if line has currency amounts (it's not an item name line)
+        if trimmed.contains("RM") || trimmed.contains("MYR") {
+            return nil
+        }
+
+        // Skip if it's a skip line
+        if shouldSkipLineItem(trimmed) {
+            return nil
+        }
+
+        // Remove quantity prefix (e.g., "1x ", "2 x ", "1 ")
+        var itemName = trimmed
+
+        // Pattern: "1x Item" or "1 x Item" or "2x Item"
+        let quantityPattern = "^\\d+\\s*x\\s*"
+        if let regex = try? NSRegularExpression(pattern: quantityPattern, options: .caseInsensitive) {
+            itemName = regex.stringByReplacingMatches(
+                in: itemName,
+                range: NSRange(itemName.startIndex..., in: itemName),
+                withTemplate: ""
+            )
+        }
+
+        // Clean up the item name
+        itemName = itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Validate: should have some letters and reasonable length
+        let letterCount = itemName.filter { $0.isLetter }.count
+        guard letterCount >= 2 && itemName.count <= 50 else { return nil }
+
+        return itemName
+    }
+
+    /// Extracts a clean modifier name (e.g., "- Take Away" → "Take Away")
+    private func extractModifierName(from text: String) -> String {
+        var modifier = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Remove leading dash/hyphen
+        if modifier.hasPrefix("-") {
+            modifier = String(modifier.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Capitalize first letter of each word
+        return modifier.capitalized
     }
 
     /// ENHANCED: Extracts line item with quantity detection and smart categorization

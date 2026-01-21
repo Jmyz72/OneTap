@@ -13,8 +13,9 @@ struct TransactionMiddleBar: View {
     @Binding var transactionDate: Date
     @Binding var merchant: String
     @Binding var splitItems: [SplitItemData]
+    @Binding var adjustments: [AdjustmentData]
     @Binding var note: String
-    
+
     @Binding var isRecurring: Bool
     @Binding var frequency: String
 
@@ -37,6 +38,7 @@ struct TransactionMiddleBar: View {
     let onAccountTap: () -> Void
     let onMerchantTap: () -> Void
     let onSplitTap: () -> Void
+    let onAdjustmentsTap: () -> Void
     let onNoteTap: () -> Void
     let onRecurringTap: () -> Void
     let onInstallmentTap: () -> Void
@@ -73,6 +75,17 @@ struct TransactionMiddleBar: View {
                             icon: "basket.fill",
                             text: splitChipText,
                             isActive: !splitItems.isEmpty
+                        )
+                    }
+                }
+
+                // Adjustments Chip (Expense only)
+                if selectedType == .expense {
+                    Button(action: onAdjustmentsTap) {
+                        chipView(
+                            icon: "plusminus",
+                            text: adjustmentsChipText,
+                            isActive: !adjustments.isEmpty
                         )
                     }
                 }
@@ -155,6 +168,24 @@ struct TransactionMiddleBar: View {
             let code = selectedAccount?.currency ?? SettingsManager.shared.currencyCode
             let amountStr = Formatters.currencyFormatter(for: code).string(from: NSNumber(value: currentTotal)) ?? ""
             return "\(splitItems.count) Items (\(amountStr))"
+        }
+    }
+
+    private var adjustmentsChipText: String {
+        if adjustments.isEmpty {
+            return "Adjustments"
+        } else {
+            let code = selectedAccount?.currency ?? SettingsManager.shared.currencyCode
+            let adjustmentTotal = adjustments.reduce(0.0) { total, adj in
+                if adj.type.isNegative {
+                    return total - adj.amount
+                } else {
+                    return total + adj.amount
+                }
+            }
+            let prefix = adjustmentTotal < 0 ? "-" : "+"
+            let amountStr = Formatters.currencyFormatter(for: code).string(from: NSNumber(value: abs(adjustmentTotal))) ?? ""
+            return "\(adjustments.count) Adj (\(prefix)\(amountStr))"
         }
     }
     

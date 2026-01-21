@@ -265,6 +265,7 @@ class TransactionRepository: BaseRepository {
             "category",
             "subCategory",
             "items",
+            "adjustments",
             "recurringTransaction"
         ]
 
@@ -309,6 +310,30 @@ class TransactionRepository: BaseRepository {
         if let items = transaction.items as? Set<TransactionItem> {
             for item in items {
                 context.delete(item)
+            }
+        }
+    }
+
+    // MARK: - Adjustments Management
+
+    /// Adds adjustments (tax, service charge, discount, rounding) to a transaction
+    func addAdjustments(_ adjustments: [AdjustmentData], to transaction: Transaction) throws {
+        for adjustment in adjustments {
+            let transactionAdjustment = TransactionAdjustment(context: context)
+            transactionAdjustment.id = UUID()
+            transactionAdjustment.type = adjustment.type.rawValue
+            transactionAdjustment.amount = adjustment.amount
+            transactionAdjustment.label = adjustment.label
+            transactionAdjustment.percentage = adjustment.percentage ?? 0
+            transactionAdjustment.transaction = transaction
+        }
+    }
+
+    /// Clears all adjustments for a transaction
+    func clearAdjustments(for transaction: Transaction) throws {
+        if let adjustments = transaction.adjustments as? Set<TransactionAdjustment> {
+            for adjustment in adjustments {
+                context.delete(adjustment)
             }
         }
     }

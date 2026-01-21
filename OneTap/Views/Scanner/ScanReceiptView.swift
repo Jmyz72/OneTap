@@ -16,6 +16,8 @@ struct ScanReceiptView: View {
     @State private var showingPhotoLibrary = false
     @State private var capturedImage: UIImage?
     @State private var showingOCRImport = false
+    @State private var showingCameraPermissionAlert = false
+    @State private var cameraErrorMessage: String?
 
     var body: some View {
         Group {
@@ -83,6 +85,16 @@ struct ScanReceiptView: View {
                     // Reload transactions when returning from OCR import
                     viewModel.loadRecentTransactions()
                 }
+            }
+            .alert("Camera Access Required", isPresented: $showingCameraPermissionAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Settings") {
+                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsURL)
+                    }
+                }
+            } message: {
+                Text(cameraErrorMessage ?? "OneTap needs camera access to scan receipts. Please enable camera access in Settings.")
             }
         }
     }
@@ -192,7 +204,9 @@ struct ScanReceiptView: View {
     private var quickScanButton: some View {
         Menu {
             Button {
-                showingCamera = true
+                Task {
+                    await checkCameraPermissionAndShow()
+                }
             } label: {
                 Label("Take Photo", systemImage: "camera.fill")
             }
@@ -219,6 +233,30 @@ struct ScanReceiptView: View {
         }
         .padding(.trailing, 24)
         .padding(.bottom, 24)
+    }
+
+    // MARK: - Helper Methods
+
+    private func checkCameraPermissionAndShow() async {
+        // Check if camera is available
+        guard ImagePicker.isCameraAvailable() else {
+            cameraErrorMessage = "Camera is not available on this device."
+            showingCameraPermissionAlert = true
+            return
+        }
+
+        // Check camera authorization
+        let isAuthorized = await ImagePicker.checkCameraAuthorization()
+        if isAuthorized {
+            await MainActor.run {
+                showingCamera = true
+            }
+        } else {
+            await MainActor.run {
+                cameraErrorMessage = nil
+                showingCameraPermissionAlert = true
+            }
+        }
     }
 }
 

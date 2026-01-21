@@ -37,28 +37,44 @@ struct AccountGroupList: View {
                         
                         // Group Accounts
                         ForEach(groupAccounts, id: \.objectID) { account in
-                            NavigationLink(destination: AccountDetailView(account: account)) {
-                                AccountRow(account: account)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                Button {
-                                    accountToEdit = account
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-
-                                Button(role: .destructive) {
-                                    Task {
-                                        await viewModel.deleteAccount(account)
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
+                            AccountRowWithMenu(
+                                account: account,
+                                accountToEdit: $accountToEdit,
+                                viewModel: viewModel
+                            )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Account Row with Context Menu
+
+private struct AccountRowWithMenu: View {
+    let account: Account
+    @Binding var accountToEdit: Account?
+    @ObservedObject var viewModel: AccountListViewModel
+
+    var body: some View {
+        NavigationLink(destination: AccountDetailView(account: account)) {
+            AccountRow(account: account)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                accountToEdit = account
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+
+            Button(role: .destructive) {
+                Task {
+                    await viewModel.deleteAccount(account)
+                }
+            } label: {
+                Label("Delete", systemImage: "trash")
             }
         }
     }

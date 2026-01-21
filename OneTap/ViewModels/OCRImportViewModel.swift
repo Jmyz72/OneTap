@@ -19,7 +19,8 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
     @Published var selectedCategory: Category?
     @Published var selectedSubCategory: SubCategory?
     @Published var amount: String = ""
-    @Published var merchant: String = ""
+    @Published var title: String = ""  // Transaction title (item name for single items)
+    @Published var merchant: String = ""  // Store/merchant name
     @Published var transactionDate: Date = Date()
     @Published var note: String = ""
 
@@ -28,6 +29,9 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
 
     @Published var splitItems: [SplitItemData] = []
     @Published var hasSplitItems: Bool = false
+
+    @Published var adjustments: [AdjustmentData] = []
+    @Published var hasAdjustments: Bool = false
 
     @Published var loadingState: LoadingState = .idle
     @Published var errorMessage: String?
@@ -119,36 +123,72 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
                 // Filter out tax/service charge items (they're tracked separately)
                 let actualItems = extracted.lineItems.filter { !$0.isTaxOrCharge }
 
-                splitItems = actualItems.map { item in
-                    // Use suggested category if available, otherwise default to main category
-                    var itemCategory = selectedCategory
+                // SINGLE ITEM RULE: If only 1 item, don't create split transaction
+                // Use the total amount (handles rounding) and item name as title
+                if actualItems.count == 1 {
+                    let singleItem = actualItems[0]
 
-                    if let suggestedCategoryName = item.suggestedCategory {
-                        // Find the category by name
-                        if let matchedCategory = categories.first(where: { $0.name == suggestedCategoryName }) {
-                            itemCategory = matchedCategory
-                        }
+                    // Set title to item name (e.g., "Tau Foo Fa (Take Away)")
+                    title = singleItem.title
+
+                    // Keep merchant as store name (already extracted)
+                    // If merchant is a generic food court name, it might need manual correction
+
+                    // Keep using the total amount (already set from extracted.amount)
+                    // This handles rounding correctly (e.g., item 7.39 + rounding 0.01 = total 7.40)
+
+                    // Set category from item suggestion if available
+                    if let suggestedCategoryName = singleItem.suggestedCategory,
+                       let matchedCategory = categories.first(where: { $0.name == suggestedCategoryName }) {
+                        selectedCategory = matchedCategory
                     }
 
-                    return SplitItemData(
-                        title: item.title,
-                        amount: item.amount,
-                        category: itemCategory,  // ENHANCED: Use smart-suggested category
-                        subCategory: nil
-                    )
-                }
-                hasSplitItems = !splitItems.isEmpty
+                    // Don't create split items for single item
+                    splitItems = []
+                    hasSplitItems = false
 
-                // If we have tax or service charges, add them to notes
-                if let tax = extracted.taxAmount {
-                    note += "\nTax: RM \(String(format: "%.2f", tax))"
+                } else {
+                    // Multiple items - create split transaction
+                    splitItems = actualItems.map { item in
+                        // Use suggested category if available, otherwise default to main category
+                        var itemCategory = selectedCategory
+
+                        if let suggestedCategoryName = item.suggestedCategory {
+                            // Find the category by name
+                            if let matchedCategory = categories.first(where: { $0.name == suggestedCategoryName }) {
+                                itemCategory = matchedCategory
+                            }
+                        }
+
+                        return SplitItemData(
+                            title: item.title,
+                            amount: item.amount,
+                            category: itemCategory,  // ENHANCED: Use smart-suggested category
+                            subCategory: nil
+                        )
+                    }
+                    hasSplitItems = !splitItems.isEmpty
                 }
-                if let serviceCharge = extracted.serviceChargeAmount {
-                    note += "\nService Charge: RM \(String(format: "%.2f", serviceCharge))"
-                }
+
             } else {
                 splitItems = []
                 hasSplitItems = false
+            }
+
+            // ENHANCED: 6. Convert extracted adjustments to AdjustmentData
+            if !extracted.adjustments.isEmpty {
+                adjustments = extracted.adjustments.map { adj in
+                    AdjustmentData(
+                        type: adj.type,
+                        amount: adj.amount,
+                        label: adj.label,
+                        percentage: adj.percentage
+                    )
+                }
+                hasAdjustments = true
+            } else {
+                adjustments = []
+                hasAdjustments = false
             }
 
             finishLoading()
@@ -180,11 +220,20 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
     func updateSplitItem(at index: Int, with item: SplitItemData) {
         guard index < splitItems.count else { return }
         splitItems[index] = item
+        syncAmountFromSplitItems()
     }
 
     func clearSplitItems() {
         splitItems.removeAll()
         hasSplitItems = false
+    }
+
+    /// Syncs the total amount from split items
+    private func syncAmountFromSplitItems() {
+        if hasSplitItems && !splitItems.isEmpty {
+            let total = splitItems.reduce(0) { $0 + $1.amount }
+            amount = String(format: "%.2f", total)
+        }
     }
 
     // MARK: - Save Transaction
@@ -193,8 +242,18 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
         startLoading()
 
         do {
-            // Validation
-            guard let amountValue = Double(amount), amountValue > 0 else {
+            // Calculate amount - use split items total if available
+            let amountValue: Double
+            if hasSplitItems && !splitItems.isEmpty {
+                amountValue = splitItems.reduce(0) { $0 + $1.amount }
+            } else {
+                guard let parsedAmount = Double(amount), parsedAmount > 0 else {
+                    throw ValidationError.invalidAmount
+                }
+                amountValue = parsedAmount
+            }
+
+            guard amountValue > 0 else {
                 throw ValidationError.invalidAmount
             }
 
@@ -202,26 +261,51 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
                 throw ValidationError.missingAccount
             }
 
-            guard let category = selectedCategory else {
-                throw ValidationError.missingCategory
+            // For split items, use the first item's category as the main category
+            // For single items, use the selectedCategory
+            let mainCategory: Category
+            if hasSplitItems && !splitItems.isEmpty {
+                // Use first item's category or fall back to selectedCategory
+                if let firstItemCategory = splitItems.first?.category {
+                    mainCategory = firstItemCategory
+                } else if let selected = selectedCategory {
+                    mainCategory = selected
+                } else {
+                    throw ValidationError.missingCategory
+                }
+            } else {
+                guard let category = selectedCategory else {
+                    throw ValidationError.missingCategory
+                }
+                mainCategory = category
             }
 
             try validationService.validateTransaction(
                 amount: amountValue,
                 type: .expense,
                 account: account,
-                category: category,
+                category: mainCategory,
                 toAccount: nil
             )
 
+            // Determine transaction title: prefer title field, fall back to merchant
+            let transactionTitle: String
+            if !title.isEmpty {
+                transactionTitle = title
+            } else if !merchant.isEmpty {
+                transactionTitle = merchant
+            } else {
+                transactionTitle = "OCR Import"
+            }
+
             // Create transaction
             let transaction = try transactionRepository.createTransaction(
-                title: merchant.isEmpty ? "OCR Import" : merchant,
+                title: transactionTitle,
                 amount: amountValue,
                 type: .expense,
                 date: transactionDate,
                 account: account,
-                category: category,
+                category: mainCategory,
                 subCategory: selectedSubCategory,
                 merchant: merchant.isEmpty ? nil : merchant,
                 notes: note.isEmpty ? nil : note,
@@ -233,6 +317,11 @@ class OCRImportViewModel: ObservableObject, ViewModelProtocol {
             // Add split items if available
             if hasSplitItems && !splitItems.isEmpty {
                 try transactionRepository.addSplitItems(splitItems, to: transaction)
+            }
+
+            // Add adjustments if available
+            if hasAdjustments && !adjustments.isEmpty {
+                try transactionRepository.addAdjustments(adjustments, to: transaction)
             }
 
             try transactionRepository.save()

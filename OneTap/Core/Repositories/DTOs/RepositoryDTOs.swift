@@ -53,3 +53,20 @@ struct CategoryUpdateData {
     let color: String?
     let order: Int?
 }
+
+// MARK: - Adjustment DTOs
+
+struct AdjustmentData: Identifiable {
+    let id = UUID()
+    var type: AdjustmentType
+    var amount: Double
+    var label: String?
+    var percentage: Double?
+
+    init(type: AdjustmentType, amount: Double, label: String? = nil, percentage: Double? = nil) {
+        self.type = type
+        self.amount = amount
+        self.label = label
+        self.percentage = percentage
+    }
+}

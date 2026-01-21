@@ -48,6 +48,12 @@ struct TransactionDetailView: View {
                                     // Items Section
                                     itemsSection()
 
+                                    // Adjustments Section (only if exists)
+                                    if transaction.hasAdjustments {
+                                        dottedLine()
+                                        adjustmentsSection()
+                                    }
+
                                     dottedLine()
 
                                     // Total Section
@@ -345,8 +351,57 @@ struct TransactionDetailView: View {
         }
     }
 
+    private func adjustmentsSection() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("ADJUSTMENTS")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(.gray)
+                .padding(.bottom, 4)
+
+            ForEach(transaction.adjustmentsArray, id: \.objectID) { adjustment in
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: adjustment.typeEnum.icon)
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+
+                        Text(adjustment.displayLabel.uppercased())
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.gray)
+                    }
+
+                    Spacer()
+
+                    Text(adjustment.formattedAmount)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(adjustment.typeEnum.isNegative ? Color(hex: "51CF66") : .white.opacity(0.7))
+                }
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
     private func totalSection() -> some View {
         VStack(spacing: 8) {
+            // Show subtotal if there are adjustments
+            if transaction.hasAdjustments && !transaction.itemsArray.isEmpty {
+                HStack {
+                    Text("SUBTOTAL")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.gray)
+
+                    Spacer()
+
+                    let code = transaction.account?.currency ?? SettingsManager.shared.currencyCode
+                    let formatter = Formatters.currencyFormatter(for: code)
+                    let subtotalStr = formatter.string(from: NSNumber(value: transaction.subtotalBeforeAdjustments)) ?? "$0.00"
+                    Text(subtotalStr)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .padding(.bottom, 4)
+            }
+
             HStack {
                 Text("TOTAL")
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -504,8 +559,7 @@ struct TransactionDetailView: View {
     }
 
     private var isFromOCR: Bool {
-        // Use KVC to check isFromOCR until Core Data entity is updated
-        (transaction.value(forKey: "isFromOCR") as? Bool) ?? false
+        transaction.isFromOCR
     }
 }
 

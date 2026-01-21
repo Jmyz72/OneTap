@@ -37,16 +37,51 @@ class OCRService {
         self.imagePreprocessingService = imagePreprocessingService
     }
 
-    /// Extracts text from image with preprocessing for optimal accuracy
+    /// Extracts text from image with smart preprocessing based on image source type
+    /// - Screenshots: No preprocessing (already perfect quality)
+    /// - Camera photos: Conservative preprocessing (gentle enhancements)
+    /// - Unknown: Dual OCR approach, selecting the better result
     func extractText(from image: UIImage) async throws -> OCRResult {
-        // ENHANCEMENT: Preprocess image before OCR for better accuracy
-        let preprocessedImage = try await imagePreprocessingService.preprocessForOCR(image)
-        return try await performOCR(on: preprocessedImage)
+        let sourceType = imagePreprocessingService.detectImageSourceType(image)
+
+        switch sourceType {
+        case .screenshot:
+            // Screenshots are already perfect digital images - no preprocessing needed
+            return try await performOCR(on: image)
+
+        case .cameraPhoto:
+            // Camera photos benefit from conservative preprocessing
+            let processed = try await imagePreprocessingService.preprocessConservative(image)
+            return try await performOCR(on: processed)
+
+        case .unknown:
+            // Unknown source - try both approaches and pick the better result
+            return try await extractTextWithFallback(from: image)
+        }
+    }
+
+    /// Dual OCR approach: runs OCR with and without preprocessing, selects better result
+    func extractTextWithFallback(from image: UIImage) async throws -> OCRResult {
+        // Run OCR on original image (best for screenshots)
+        let originalResult = try await performOCR(on: image)
+
+        // Run OCR on conservatively preprocessed image (best for camera photos)
+        let processedImage = try await imagePreprocessingService.preprocessConservative(image)
+        let processedResult = try await performOCR(on: processedImage)
+
+        // Select the better result based on quality heuristics
+        return selectBetterResult(originalResult, processedResult)
     }
 
     /// Extracts text without preprocessing (for testing/comparison)
     func extractTextWithoutPreprocessing(from image: UIImage) async throws -> OCRResult {
         return try await performOCR(on: image)
+    }
+
+    /// Extracts text with full aggressive preprocessing (for very poor quality images)
+    func extractTextWithFullPreprocessing(from image: UIImage) async throws -> OCRResult {
+        let processed = try await imagePreprocessingService.preprocessFull(image)
+        return try await performOCR(on: processed)
     }
 
     private func performOCR(on image: UIImage) async throws -> OCRResult {
@@ -242,7 +277,7 @@ class OCRService {
 
         var amount: Double? = nil
         var merchant: String? = nil
-        var reference: String? = nil
+        let reference: String? = nil
 
         // Simple parser for common tags
         // Tag 54: Transaction Amount
@@ -269,5 +304,96 @@ class OCRService {
         }
 
         return nil
+    }
+
+    // MARK: - Quality Scoring for Result Selection
+
+    /// Selects the better OCR result between two candidates based on quality heuristics
+    private func selectBetterResult(_ result1: OCRResult, _ result2: OCRResult) -> OCRResult {
+        let score1 = calculateContentQualityScore(result1)
+        let score2 = calculateContentQualityScore(result2)
+
+        // If both scores are very low, prefer higher confidence
+        if score1 < 5 && score2 < 5 {
+            return result1.confidence >= result2.confidence ? result1 : result2
+        }
+
+        // Return the result with higher quality score
+        return score1 >= score2 ? result1 : result2
+    }
+
+    /// Calculates a quality score for OCR results based on content heuristics
+    /// Higher score = better quality, more likely to be correctly extracted text
+    private func calculateContentQualityScore(_ result: OCRResult) -> Int {
+        var score = 0
+        let text = result.fullText
+
+        // Check for currency patterns (Malaysian Ringgit)
+        // RM, MYR followed by numbers
+        let rmPattern = "(?i)(RM|MYR)\\s*[\\d,]+\\.?\\d*"
+        if text.range(of: rmPattern, options: .regularExpression) != nil {
+            score += 20
+        }
+
+        // Check for decimal amounts (common in receipts)
+        let decimalPattern = "\\d+\\.\\d{2}"
+        let decimalMatches = text.matches(of: try! Regex(decimalPattern))
+        score += min(decimalMatches.count * 5, 25) // Cap at 25 points
+
+        // Check for date patterns (dd/mm/yyyy, dd-mm-yyyy, etc.)
+        let datePatterns = [
+            "\\d{1,2}[/\\-]\\d{1,2}[/\\-]\\d{2,4}",
+            "\\d{1,2}\\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{2,4}"
+        ]
+        for pattern in datePatterns {
+            if text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                score += 15
+                break
+            }
+        }
+
+        // Check for time patterns (HH:MM, HH:MM:SS)
+        let timePattern = "\\d{1,2}:\\d{2}(:\\d{2})?"
+        if text.range(of: timePattern, options: .regularExpression) != nil {
+            score += 10
+        }
+
+        // Check for common receipt keywords
+        let receiptKeywords = [
+            "total", "subtotal", "tax", "gst", "sst", "change", "cash", "card",
+            "receipt", "invoice", "qty", "quantity", "price", "amount",
+            "terima kasih", "thank you", "payment"
+        ]
+        let lowercasedText = text.lowercased()
+        for keyword in receiptKeywords {
+            if lowercasedText.contains(keyword) {
+                score += 5
+            }
+        }
+
+        // Penalize garbage characters (excessive special characters, control characters)
+        let garbagePattern = "[\\x00-\\x1F\\x7F-\\x9F]"
+        let garbageCount = text.matches(of: try! Regex(garbagePattern)).count
+        score -= garbageCount * 3
+
+        // Penalize excessive consonant clusters (indication of garbled text)
+        let consonantClusterPattern = "[bcdfghjklmnpqrstvwxyz]{5,}"
+        let clusterMatches = text.lowercased().matches(of: try! Regex(consonantClusterPattern))
+        score -= clusterMatches.count * 10
+
+        // Penalize very short results (probably failed OCR)
+        if text.count < 20 {
+            score -= 20
+        }
+
+        // Bonus for higher confidence
+        score += Int(result.confidence * 20)
+
+        // Bonus for reasonable number of lines (receipts have multiple lines)
+        if result.lines.count >= 3 && result.lines.count <= 100 {
+            score += 10
+        }
+
+        return max(0, score)
     }
 }

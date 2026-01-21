@@ -41,6 +41,7 @@ private struct EditTransactionContent: View {
     @State private var showingNoteInput = false
     @State private var showingMerchantInput = false
     @State private var showingSplitSheet = false
+    @State private var showingAdjustmentsSheet = false
     @State private var showingRecurringPresetSheet = false
 
     @FocusState private var focusedField: TransactionDetailsInput.Field?
@@ -65,6 +66,12 @@ private struct EditTransactionContent: View {
                     items: $viewModel.splitItems,
                     currencyCode: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode,
                     categories: viewModel.categories
+                )
+            }
+            .sheet(isPresented: $showingAdjustmentsSheet) {
+                AdjustmentsSheet(
+                    adjustments: $viewModel.adjustments,
+                    currencyCode: viewModel.selectedAccount?.currency ?? SettingsManager.shared.currencyCode
                 )
             }
             .sheet(item: $categoryForSubcategoryPicker) { category in
@@ -201,6 +208,7 @@ private struct EditTransactionContent: View {
             transactionDate: $viewModel.transactionDate,
             merchant: $viewModel.merchant,
             splitItems: $viewModel.splitItems,
+            adjustments: $viewModel.adjustments,
             note: $viewModel.note,
             isRecurring: $viewModel.isRecurring,
             frequency: $viewModel.frequency,
@@ -219,6 +227,7 @@ private struct EditTransactionContent: View {
             onAccountTap: { showingAccountPicker = true },
             onMerchantTap: { showingMerchantInput = true },
             onSplitTap: { showingSplitSheet = true },
+            onAdjustmentsTap: { showingAdjustmentsSheet = true },
             onNoteTap: { showingNoteInput = true },
             onRecurringTap: { showingRecurringPresetSheet = true },
             onInstallmentTap: { },
