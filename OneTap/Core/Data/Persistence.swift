@@ -5,6 +5,7 @@
 //  Created by Jimmy Hew on 29/12/2025.
 //
 
+import Combine
 @preconcurrency internal import CoreData
 
 class PersistenceController {

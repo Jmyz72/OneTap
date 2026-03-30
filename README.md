@@ -1,70 +1,101 @@
-# OneTap - Personal Finance iOS App
+# OneTap
 
-A modern, scalable SwiftUI-based personal finance tracking app using **MVVM** and **Core Data**.
+OneTap is a SwiftUI personal finance app built as an end-to-end iOS project for tracking accounts, transactions, budgets, recurring payments, and receipt imports.
 
-## 🏗️ Project Structure
+This repository is the source code behind the app and is intended to show practical iOS engineering work rather than a small demo. The project includes Core Data persistence, dependency injection, feature-specific view models, background processing, and OCR-assisted transaction import flows.
 
-The project follows a clean **MVVM + Repository** architecture:
+## Highlights
 
-```
+- Track transactions across multiple account types, including checking, savings, cash, and credit cards
+- Support transfers, split transactions, balance adjustments, and running account balances
+- Manage recurring transactions and installment plans with background processing on app launch
+- Organize spending with editable categories, subcategories, budgets, and claims tracking
+- Import transactions from receipts and screenshots using OCR, image preprocessing, and extraction services
+- View account summaries, home insights, budgets, and analytics in a tab-based SwiftUI app
+
+## Technical Focus
+
+- `SwiftUI` for the app UI
+- `Core Data` for persistence and model relationships
+- `MVVM` for presentation logic
+- `Repository + Service` layers to separate data access from business logic
+- `Dependency Injection` through a central `DependencyContainer`
+- `async/await` and background task integration for recurring transaction processing
+- `App Intents` support for transaction import shortcuts
+
+## Architecture
+
+The app is organized around feature-specific views and view models, backed by repositories and services:
+
+```text
 OneTap/
-├── ViewModels/               # Presentation Logic
-├── Views/                    # SwiftUI Views
+├── AppIntents/        # App shortcuts and import intents
 ├── Core/
-│   ├── Repositories/         # Data Access Layer
-│   ├── Services/             # Business Logic (Balance, Transfers)
-│   └── DI/                   # Dependency Injection
-└── Models/                   # Domain Models
+│   ├── Data/          # Core Data stack and persistence setup
+│   ├── DI/            # Dependency container and factories
+│   ├── Repositories/  # Data access layer
+│   ├── Services/      # Business logic and workflow services
+│   ├── Settings/      # App-level preferences
+│   └── Theme/         # Shared styling and icons
+├── Models/            # Core Data model extensions and domain helpers
+├── ViewModels/        # Presentation logic per feature
+└── Views/             # SwiftUI screens for transactions, accounts, OCR, budgets, analytics, and settings
 ```
 
-## ✨ Features
+Two implementation details that drive the app design:
 
-### Transaction Management
-- ✅ Add, Edit, Delete Transactions
-- ✅ Split Transactions (Multiple categories per transaction)
-- ✅ Search and Filter (Date, Category, Text)
-- ✅ Recurring Transactions (Foundation laid)
+- Every transaction participates in account balance tracking, including recalculation after edits or transfers.
+- Transfers are modeled as paired transactions, which keeps account history and balance updates explicit.
 
-### Account Management
-- ✅ Multiple Accounts (Checking, Savings, Credit Card, Cash)
-- ✅ **Transfers** between accounts
-- ✅ **Running Balance** tracking
-- ✅ Account Grouping (Liquid, Credit, etc.)
+## Running The Project
 
-### Organization
-- ✅ Custom Categories with Icons and Colors
-- ✅ Sub-categories support
+### Requirements
 
-### UI/UX
-- ✅ Modern SwiftUI Interface
-- ✅ Dark Mode Support
-- ✅ Haptic Feedback
-- ✅ Native iOS Look & Feel
+- Xcode
+- iOS Simulator
 
-## 🔮 Roadmap
-
-### Phase 3: Budgeting (Next)
-- [ ] Monthly Budgets per Category
-- [ ] Progress Bars and Alerts
-
-### Phase 4: Assets
-- [ ] Stock and Crypto tracking
-- [ ] Net Worth History
-
-### Phase 5: Analytics
-- [ ] Visual Charts (Swift Charts)
-- [ ] Monthly Reports
-
-## 🚀 Getting Started
+### Open and run
 
 1. Open `OneTap.xcodeproj` in Xcode.
-2. Select a simulator (iOS 16+).
-3. Run (⌘R).
+2. Select the `OneTap` scheme.
+3. Build and run on an iPhone simulator.
 
-## 🛠 Tech Stack
+### Command-line build
 
-- **Language**: Swift 5
-- **UI Framework**: SwiftUI
-- **Persistence**: Core Data
-- **Architecture**: MVVM + Repository + Dependency Injection
-- **Concurrency**: Swift Async/Await
+```bash
+xcodebuild -project OneTap.xcodeproj -scheme OneTap -configuration Debug -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+```
+
+## Notable Features In This Repository
+
+### Transactions and balances
+
+- Add, edit, delete, and inspect transactions
+- Split transactions into multiple items
+- Transfer money between accounts
+- Recalculate running balances after changes
+
+### Planning and tracking
+
+- Budgets and budget list views
+- Recurring transactions and installment plans
+- Claims tracking support
+
+### Receipt import
+
+- Receipt scanning and screenshot import flows
+- OCR preprocessing, extraction, validation, and learning services
+- Category matching helpers for imported items
+
+## Current Status
+
+- The app builds successfully from the command line with the `OneTap` scheme.
+- The repository currently does not include a dedicated automated test target.
+- Some supporting docs in the repo were written during development and may be more detailed than a typical portfolio project.
+
+## What This Project Demonstrates
+
+- Building a non-trivial SwiftUI application with multiple feature areas
+- Designing a layered architecture that can grow beyond a single screen or CRUD flow
+- Managing Core Data relationships and background updates
+- Handling app-level workflows such as recurring processing, receipt import, and migration recovery

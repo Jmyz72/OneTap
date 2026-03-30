@@ -1,0 +1,18 @@
+.DS_Store
+
+# Xcode user and build artifacts
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local AI/editor guidance
+.claude/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
