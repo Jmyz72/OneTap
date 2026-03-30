@@ -83,6 +83,7 @@ class TransferService: TransferServiceProtocol {
             notes: notes
         )
         destTransaction.relatedTransactionID = linkID
+        destTransaction.isIncomingTransfer = true  // Mark as incoming transfer for reliable balance calculation
 
         // Save atomically
         try transactionRepository.save()

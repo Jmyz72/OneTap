@@ -44,6 +44,7 @@ final class DependencyContainer: ObservableObject {
     let ocrLearningService: OCRLearningService  // PHASE 3
     let transactionExtractionService: TransactionExtractionService
     let categoryMatchingService: CategoryMatchingService
+    let exchangeRateService: ExchangeRateService
 
     init(persistenceController: PersistenceController? = nil) {
         let pc = persistenceController ?? PersistenceController.shared
@@ -97,6 +98,7 @@ final class DependencyContainer: ObservableObject {
             learningService: ocrLearningService  // PHASE 3
         )
         self.categoryMatchingService = CategoryMatchingService(categoryRepository: categoryRepository)
+        self.exchangeRateService = ExchangeRateService()
     }
 
     // MARK: - ViewModel Factories
@@ -146,7 +148,10 @@ final class DependencyContainer: ObservableObject {
     }
 
     func makeAccountListViewModel() -> AccountListViewModel {
-        AccountListViewModel(accountRepository: accountRepository)
+        AccountListViewModel(
+            accountRepository: accountRepository,
+            exchangeRateService: exchangeRateService
+        )
     }
 
     func makeAccountDetailViewModel(account: Account) -> AccountDetailViewModel {
@@ -234,7 +239,8 @@ final class DependencyContainer: ObservableObject {
             recurringTransactionRepository: recurringTransactionRepository,
             pendingRecurringRepository: pendingRecurringRepository,
             claimRepository: claimRepository,
-            balanceService: balanceService
+            balanceService: balanceService,
+            exchangeRateService: exchangeRateService
         )
     }
 

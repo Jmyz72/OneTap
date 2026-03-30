@@ -159,15 +159,20 @@ extension Transaction {
     // MARK: - Transfer Helpers
 
     /// Returns true if this is the destination side of a transfer (incoming transfer)
+    /// Uses the isIncomingTransfer flag with fallback to title prefix for legacy data
     var isTransferDestination: Bool {
         guard typeEnum == .transfer else { return false }
+        // Primary: use the reliable Boolean flag
+        if isIncomingTransfer { return true }
+        // Fallback: check title for legacy transfers created before flag was added
         return title?.hasPrefix("Transfer from") ?? false
     }
 
     /// Returns true if this is the source side of a transfer (outgoing transfer)
+    /// The source is any transfer that is NOT an incoming transfer
     var isTransferSource: Bool {
         guard typeEnum == .transfer else { return false }
-        return title?.hasPrefix("Transfer to") ?? false
+        return !isTransferDestination
     }
 }
 

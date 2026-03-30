@@ -10,6 +10,10 @@
 class PersistenceController {
     static let shared = PersistenceController()
 
+    /// Flag indicating if migration failed and recovery is needed
+    @Published var migrationFailed = false
+    private var pendingStoreDescription: NSPersistentStoreDescription?
+
     @MainActor
     static let preview: PersistenceController = {
         let result = PersistenceController(inMemory: true)
@@ -119,27 +123,31 @@ class PersistenceController {
             )
         }
         
-        container.loadPersistentStores(completionHandler: { (storeDescription, error) in
+        container.loadPersistentStores(completionHandler: { [weak self] (storeDescription, error) in
             if let error = error as NSError? {
-                // Development Recovery: If migration fails, delete the store and retry
-                // WARNING: This deletes user data. Acceptable for dev/beta phase if schema breaks.
-                if error.code == 134140 || error.domain == NSCocoaErrorDomain {
-                    do {
-                        let url = storeDescription.url!
-                        try self.container.persistentStoreCoordinator.destroyPersistentStore(at: url, ofType: storeDescription.type, options: nil)
-                        print("Migration failed. Persistent store destroyed. Recreating...")
+                // Migration or loading failed - handle gracefully
+                // Common codes: 134140 (migration), 134110 (incompatible store)
+                if error.code == 134140 || error.code == 134110 || error.domain == NSCocoaErrorDomain {
+                    print("Database migration/loading failed: \(error.localizedDescription)")
 
-                        // Retry loading
-                        self.container.loadPersistentStores { _, retryError in
-                            if let retryError = retryError as NSError? {
-                                fatalError("Unresolved error after reset \(retryError), \(retryError.userInfo)")
-                            }
+                    // Store the description for later recovery
+                    self?.pendingStoreDescription = storeDescription
+                    self?.migrationFailed = true
+
+                    // Notify the UI through MigrationErrorHandler
+                    if let url = storeDescription.url {
+                        Task { @MainActor in
+                            MigrationErrorHandler.shared.handleMigrationFailure(error: error, storeURL: url)
                         }
-                    } catch {
-                        fatalError("Failed to destroy persistent store: \(error)")
+                    }
+
+                    // Attempt automatic backup before any destructive action
+                    if let url = storeDescription.url {
+                        self?.createBackup(of: url)
                     }
                 } else {
-                    fatalError("Unresolved error \(error), \(error.userInfo)")
+                    // Non-migration errors - log but don't crash
+                    print("Persistent store error: \(error), \(error.userInfo)")
                 }
             }
         })
@@ -240,4 +248,74 @@ class PersistenceController {
     // NOTE: Balance recalculation logic has been moved to BalanceService
     // for better separation of concerns and testability.
     // Use DependencyContainer.balanceService.recalculateBalances() instead.
+
+    // MARK: - Migration Recovery
+
+    /// Creates a backup of the database before destructive operations
+    private func createBackup(of storeURL: URL) {
+        let fileManager = FileManager.default
+        let backupURL = storeURL.deletingLastPathComponent()
+            .appendingPathComponent("OneTap_backup_\(Date().timeIntervalSince1970).sqlite")
+
+        do {
+            // Backup the main store file
+            if fileManager.fileExists(atPath: storeURL.path) {
+                try fileManager.copyItem(at: storeURL, to: backupURL)
+                print("Database backup created at: \(backupURL.path)")
+            }
+
+            // Also backup WAL and SHM files if they exist
+            let walURL = storeURL.appendingPathExtension("wal")
+            let shmURL = storeURL.appendingPathExtension("shm")
+
+            if fileManager.fileExists(atPath: walURL.path) {
+                try fileManager.copyItem(at: walURL, to: backupURL.appendingPathExtension("wal"))
+            }
+            if fileManager.fileExists(atPath: shmURL.path) {
+                try fileManager.copyItem(at: shmURL, to: backupURL.appendingPathExtension("shm"))
+            }
+        } catch {
+            print("Failed to create backup: \(error.localizedDescription)")
+        }
+    }
+
+    /// Resets the database by destroying and recreating the persistent store
+    /// Call this after user confirms they want to reset their data
+    func resetDatabaseAfterMigrationFailure() {
+        guard let storeDescription = pendingStoreDescription,
+              let url = storeDescription.url else {
+            print("No pending store description to reset")
+            return
+        }
+
+        do {
+            // Destroy the incompatible store
+            try container.persistentStoreCoordinator.destroyPersistentStore(
+                at: url,
+                ofType: storeDescription.type,
+                options: nil
+            )
+            print("Persistent store destroyed for recovery")
+
+            // Retry loading the store
+            container.loadPersistentStores { [weak self] _, retryError in
+                if let retryError = retryError {
+                    print("Failed to recreate store after reset: \(retryError.localizedDescription)")
+                } else {
+                    print("Store successfully recreated")
+                    self?.migrationFailed = false
+                    self?.pendingStoreDescription = nil
+
+                    // Re-seed default categories
+                    self?.seedCategoriesIfEmpty()
+
+                    Task { @MainActor in
+                        MigrationErrorHandler.shared.reset()
+                    }
+                }
+            }
+        } catch {
+            print("Failed to destroy persistent store during reset: \(error.localizedDescription)")
+        }
+    }
 }

@@ -24,14 +24,18 @@ class AccountListViewModel: ObservableObject, ViewModelProtocol {
 
     // MARK: - Dependencies
     private let accountRepository: AccountRepository
+    private let exchangeRateService: ExchangeRateService
     private var cancellables = Set<AnyCancellable>()
+    private var calculateTotalsTask: Task<Void, Never>?
 
-    init(accountRepository: AccountRepository) {
+    init(accountRepository: AccountRepository, exchangeRateService: ExchangeRateService) {
         self.accountRepository = accountRepository
+        self.exchangeRateService = exchangeRateService
         setupSubscriptions()
     }
 
     deinit {
+        calculateTotalsTask?.cancel()
         cancellables.forEach { $0.cancel() }
         cancellables.removeAll()
     }
@@ -62,15 +66,46 @@ class AccountListViewModel: ObservableObject, ViewModelProtocol {
     }
 
     private func calculateTotals() {
-        totalAssets = accounts
-            .filter { !$0.isLiability }
-            .reduce(0) { $0 + $1.balance }
+        let baseCurrency = SettingsManager.shared.currencyCode
 
-        totalLiabilities = accounts
-            .filter { $0.isLiability }
-            .reduce(0) { $0 + abs($1.balance) }
+        // Cancel any in-flight calculation to prevent race conditions
+        calculateTotalsTask?.cancel()
 
-        netWorth = totalAssets - totalLiabilities
+        // Capture accounts for use in task
+        let currentAccounts = accounts
+
+        // Use a Task to handle async currency conversion
+        calculateTotalsTask = Task {
+            var assets: Double = 0
+            var liabilities: Double = 0
+
+            for account in currentAccounts {
+                // Check for cancellation between iterations
+                guard !Task.isCancelled else { return }
+
+                let accountCurrency = account.currency ?? baseCurrency
+                let balance = account.balance
+
+                // Convert to base currency if different
+                let convertedBalance = await exchangeRateService.convertToBase(
+                    amount: abs(balance),
+                    fromCurrency: accountCurrency,
+                    baseCurrency: baseCurrency
+                )
+
+                if account.isLiability {
+                    liabilities += convertedBalance
+                } else {
+                    assets += convertedBalance
+                }
+            }
+
+            // Only update state if not cancelled
+            guard !Task.isCancelled else { return }
+            totalAssets = assets
+            totalLiabilities = liabilities
+            netWorth = assets - liabilities
+        }
     }
 
     // MARK: - Actions
@@ -91,10 +126,7 @@ class AccountListViewModel: ObservableObject, ViewModelProtocol {
 
     // MARK: - Formatting
 
-    func formatCurrency(_ value: Double) -> String {
-        let formatter = Formatters.currencyFormatter(for: SettingsManager.shared.currencyCode)
-        return formatter.string(from: NSNumber(value: value)) ?? "$0.00"
-    }
+    // Note: formatCurrency is provided by ViewModelProtocol extension
 
     func formatAccountBalance(_ account: Account) -> String {
         let formatter = Formatters.currencyFormatter(for: account.currency ?? SettingsManager.shared.currencyCode)

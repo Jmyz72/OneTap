@@ -218,11 +218,13 @@ class BalanceService: BalanceServiceProtocol {
 
         case .transfer:
             // Transfer transactions can be either outgoing or incoming
-            // Check the title to determine direction:
-            // "Transfer to X" = outgoing (decreases balance)
-            // "Transfer from X" = incoming (increases balance)
-            if let title = transaction.title, title.hasPrefix("Transfer from") {
+            // Use the isIncomingTransfer flag to determine direction (reliable Boolean)
+            // Fallback to title prefix check for backwards compatibility with existing data
+            if transaction.isIncomingTransfer {
                 // Incoming transfer - increases balance
+                return balance + amount
+            } else if let title = transaction.title, title.hasPrefix("Transfer from") {
+                // Legacy check for existing transfers before isIncomingTransfer was added
                 return balance + amount
             } else {
                 // Outgoing transfer - decreases balance

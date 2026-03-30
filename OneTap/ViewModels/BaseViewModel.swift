@@ -58,4 +58,17 @@ extension ViewModelProtocol {
     func finishLoading() {
         loadingState = .loaded
     }
+
+    // MARK: - Currency Formatting
+
+    /// Formats a currency amount using the specified or default currency code
+    /// - Parameters:
+    ///   - amount: The amount to format
+    ///   - currencyCode: Optional currency code. If nil, uses SettingsManager.shared.currencyCode
+    /// - Returns: Formatted currency string (e.g., "RM1,234.56")
+    func formatCurrency(_ amount: Double, currencyCode: String? = nil) -> String {
+        let code = currencyCode ?? SettingsManager.shared.currencyCode
+        let formatter = Formatters.currencyFormatter(for: code)
+        return formatter.string(from: NSNumber(value: amount)) ?? "$0"
+    }
 }

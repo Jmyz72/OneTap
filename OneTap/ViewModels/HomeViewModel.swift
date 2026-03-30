@@ -48,7 +48,9 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     private let pendingRecurringRepository: PendingRecurringRepository
     private let claimRepository: ClaimRepository
     private let balanceService: BalanceService
+    private let exchangeRateService: ExchangeRateService
     private var cancellables = Set<AnyCancellable>()
+    private var calculateBalancesTask: Task<Void, Never>?
 
     init(
         accountRepository: AccountRepository,
@@ -57,7 +59,8 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         recurringTransactionRepository: RecurringTransactionRepository,
         pendingRecurringRepository: PendingRecurringRepository,
         claimRepository: ClaimRepository,
-        balanceService: BalanceService
+        balanceService: BalanceService,
+        exchangeRateService: ExchangeRateService
     ) {
         self.accountRepository = accountRepository
         self.transactionRepository = transactionRepository
@@ -66,6 +69,7 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         self.pendingRecurringRepository = pendingRecurringRepository
         self.claimRepository = claimRepository
         self.balanceService = balanceService
+        self.exchangeRateService = exchangeRateService
 
         setupObservers()
         Task {
@@ -74,6 +78,7 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
     }
 
     deinit {
+        calculateBalancesTask?.cancel()
         cancellables.forEach { $0.cancel() }
         cancellables.removeAll()
     }
@@ -189,23 +194,45 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
 
     private func calculateAccountBalances() {
         let accounts = accountRepository.fetchAccounts(group: nil, includeArchived: false)
+        let baseCurrency = SettingsManager.shared.currencyCode
 
-        var assets: Double = 0
-        var liabilities: Double = 0
+        // Cancel any in-flight calculation to prevent race conditions
+        calculateBalancesTask?.cancel()
 
-        for account in accounts {
-            if account.isLiability {
-                // Credit cards, BNPL - negative balance means owed
-                liabilities += abs(account.balance)
-            } else {
-                // Regular accounts - positive balance
-                assets += account.balance
+        // Use a Task to handle async currency conversion
+        calculateBalancesTask = Task {
+            var assets: Double = 0
+            var liabilities: Double = 0
+
+            for account in accounts {
+                // Check for cancellation between iterations
+                guard !Task.isCancelled else { return }
+
+                let accountCurrency = account.currency ?? baseCurrency
+                let balance = account.balance
+
+                // Convert to base currency if different
+                let convertedBalance = await exchangeRateService.convertToBase(
+                    amount: abs(balance),
+                    fromCurrency: accountCurrency,
+                    baseCurrency: baseCurrency
+                )
+
+                if account.isLiability {
+                    // Credit cards, BNPL - negative balance means owed
+                    liabilities += convertedBalance
+                } else {
+                    // Regular accounts - positive balance
+                    assets += convertedBalance
+                }
             }
-        }
 
-        totalAssets = assets
-        totalLiabilities = liabilities
-        totalBalance = assets - liabilities
+            // Only update state if not cancelled
+            guard !Task.isCancelled else { return }
+            totalAssets = assets
+            totalLiabilities = liabilities
+            totalBalance = assets - liabilities
+        }
     }
 
     private func calculateMonthlyTotals() {
@@ -398,6 +425,8 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         !pendingRecurringTransactions.isEmpty
     }
 
+    // Note: formatCurrency is provided by ViewModelProtocol extension
+
     func approvePendingTransaction(_ pending: PendingRecurringTransaction) async {
         do {
             let transaction = try pendingRecurringRepository.approve(pending)
@@ -428,11 +457,6 @@ class HomeViewModel: ObservableObject, ViewModelProtocol {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    private func formatCurrency(_ amount: Double) -> String {
-        let formatter = Formatters.currencyFormatter(for: SettingsManager.shared.currencyCode)
-        return formatter.string(from: NSNumber(value: amount)) ?? "$0"
     }
 }
 

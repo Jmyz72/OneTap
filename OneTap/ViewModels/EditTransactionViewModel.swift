@@ -128,6 +128,11 @@ class EditTransactionViewModel: ObservableObject, ViewModelProtocol, MerchantPic
         }
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     // MARK: - Computed Properties
 
     var isValid: Bool {

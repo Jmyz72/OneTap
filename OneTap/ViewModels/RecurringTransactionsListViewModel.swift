@@ -24,6 +24,11 @@ class RecurringTransactionsListViewModel: ObservableObject {
         observeRecurringTransactions()
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     private func observeRecurringTransactions() {
         repository.recurringTransactionsPublisher()
             .receive(on: DispatchQueue.main)

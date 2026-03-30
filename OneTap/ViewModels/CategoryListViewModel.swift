@@ -33,6 +33,11 @@ class CategoryListViewModel: ObservableObject, ViewModelProtocol {
         self.incomeCategories = allCategories.filter { $0.typeEnum == .income }.sorted { $0.order < $1.order }
     }
 
+    deinit {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+    }
+
     // MARK: - Subscriptions
 
     private func setupSubscriptions() {

@@ -30,10 +30,16 @@ class AccountTransactionListViewModel: ObservableObject, ViewModelProtocol {
     init(account: Account, transactionRepository: TransactionRepository) {
         self.account = account
         self.transactionRepository = transactionRepository
-        
+
         // Setup subscriptions. CombineLatest will fire once immediately upon subscription
         // with the initial nil values, which will trigger the first fetch.
         setupSubscriptions()
+    }
+
+    deinit {
+        dataCancellable?.cancel()
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
     }
 
     private func setupSubscriptions() {

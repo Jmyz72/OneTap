@@ -11,6 +11,7 @@ internal import CoreData
 @main
 struct OneTapApp: App {
     @StateObject private var dependencyContainer = DependencyContainer()
+    @StateObject private var migrationErrorHandler = MigrationErrorHandler.shared
 
     // State for OCR import deep linking
     @State private var ocrImportScreenshot: UIImage?
@@ -50,6 +51,19 @@ struct OneTapApp: App {
                     if let screenshot = ocrImportScreenshot {
                         OCRImportView(screenshot: screenshot)
                     }
+                }
+                .alert("Database Update Required", isPresented: $migrationErrorHandler.showRecoveryDialog) {
+                    Button("Reset Data", role: .destructive) {
+                        dependencyContainer.persistenceController.resetDatabaseAfterMigrationFailure()
+                    }
+                    Button("Contact Support", role: .cancel) {
+                        // Open support email or documentation
+                        if let url = URL(string: "mailto:support@onetapapp.com?subject=Database%20Migration%20Issue") {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                } message: {
+                    Text("OneTap needs to update its database but encountered an issue. A backup has been created. You can reset your data to continue using the app, or contact support for help recovering your data.")
                 }
         }
     }
