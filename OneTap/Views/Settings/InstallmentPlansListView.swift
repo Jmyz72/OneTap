@@ -5,6 +5,7 @@
 //  View for managing installment plans in Settings
 //
 
+internal import CoreData
 import SwiftUI
 
 struct InstallmentPlansListView: View {

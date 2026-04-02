@@ -5,6 +5,7 @@
 //  Home dashboard with shortcuts and summaries
 //
 
+internal import CoreData
 import SwiftUI
 
 struct HomeView: View {

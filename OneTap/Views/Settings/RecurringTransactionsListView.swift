@@ -5,6 +5,7 @@
 //  View for managing recurring transactions in Settings
 //
 
+internal import CoreData
 import SwiftUI
 
 struct RecurringTransactionsListView: View {

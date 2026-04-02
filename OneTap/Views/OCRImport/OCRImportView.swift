@@ -6,6 +6,7 @@
 //  Styled as an editable receipt
 //
 
+internal import CoreData
 import SwiftUI
 
 struct OCRImportView: View {

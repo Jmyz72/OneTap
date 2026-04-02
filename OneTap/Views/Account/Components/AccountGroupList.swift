@@ -5,6 +5,7 @@
 //  Created by Jimmy Hew on 04/01/2026.
 //
 
+internal import CoreData
 import SwiftUI
 
 struct AccountGroupList: View {
